@@ -56,6 +56,16 @@ object UserService {
         }
     }
 
+    fun findEnabledUserId(username: String): Int? =
+        transaction(DBManager.db) {
+            UserTable
+                .selectAll()
+                .where { (UserTable.username eq username) and (UserTable.enabled eq true) }
+                .firstOrNull()
+                ?.get(UserTable.id)
+                ?.value
+        }
+
     fun authenticate(username: String, password: String): Int? =
         transaction(DBManager.db) {
             val user =

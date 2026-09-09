@@ -64,7 +64,9 @@ fun getUserFromContext(ctx: Context): UserType {
         }
 
         AuthMode.SIMPLE_LOGIN -> {
-            if (cookieValid()) UserType.Admin(1) else UserType.Visitor
+            val username = ctx.sessionAttribute<String>("logged-in")
+            val userId = username?.let { UserService.findEnabledUserId(it) }
+            if (cookieValid() && userId != null) UserType.Admin(userId) else UserType.Visitor
         }
 
         AuthMode.UI_LOGIN -> {
@@ -89,7 +91,9 @@ fun getUserFromWsContext(ctx: WsConnectContext): UserType {
         }
 
         AuthMode.SIMPLE_LOGIN -> {
-            if (cookieValid()) UserType.Admin(1) else UserType.Visitor
+            val username = ctx.sessionAttribute<String>("logged-in")
+            val userId = username?.let { UserService.findEnabledUserId(it) }
+            if (cookieValid() && userId != null) UserType.Admin(userId) else UserType.Visitor
         }
 
         AuthMode.UI_LOGIN -> {

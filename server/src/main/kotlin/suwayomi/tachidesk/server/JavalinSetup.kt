@@ -40,6 +40,7 @@ import suwayomi.tachidesk.manga.MangaAPI
 import suwayomi.tachidesk.opds.OpdsAPI
 import suwayomi.tachidesk.server.user.ForbiddenException
 import suwayomi.tachidesk.server.user.UnauthorizedException
+import suwayomi.tachidesk.server.user.UserService
 import suwayomi.tachidesk.server.user.UserType
 import suwayomi.tachidesk.server.user.getUserFromContext
 import suwayomi.tachidesk.server.user.getUserFromWsContext
@@ -207,8 +208,12 @@ object JavalinSetup {
             val username = ctx.formParam("user")
             val password = ctx.formParam("pass")
             val isValid =
-                username == serverConfig.authUsername.value &&
-                    password == serverConfig.authPassword.value
+                if (serverConfig.authMode.value == AuthMode.UI_LOGIN || serverConfig.authMode.value == AuthMode.SIMPLE_LOGIN) {
+                    username != null && password != null && UserService.authenticate(username, password) != null
+                } else {
+                    username == serverConfig.authUsername.value &&
+                        password == serverConfig.authPassword.value
+                }
 
             if (isValid) {
                 val redirect = ctx.queryParam("redirect") ?: ServerSubpath.maybeAddAsPrefix("/")
