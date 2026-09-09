@@ -73,6 +73,17 @@ object UserService {
 
     fun hasPermission(userId: Int, node: String): Boolean =
         transaction(DBManager.db) {
+            val userRole =
+                UserTable
+                    .innerJoin(RoleTable)
+                    .selectAll()
+                    .where { UserTable.id eq userId }
+                    .firstOrNull()
+                    ?.get(RoleTable.name)
+            if (userRole == OWNER_ROLE) {
+                return@transaction true
+            }
+
             RolePermissionTable
                 .innerJoin(UserTable)
                 .innerJoin(PermissionTable)
