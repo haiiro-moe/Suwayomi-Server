@@ -17,6 +17,10 @@ import suwayomi.tachidesk.graphql.server.primitives.NodeList
 import suwayomi.tachidesk.graphql.server.primitives.PageInfo
 import suwayomi.tachidesk.manga.model.dataclass.ChapterDataClass
 import suwayomi.tachidesk.manga.model.table.ChapterTable
+import suwayomi.tachidesk.server.JavalinSetup.Attribute
+import suwayomi.tachidesk.server.user.UserChapterStateService
+import suwayomi.tachidesk.server.user.requireUser
+import suwayomi.tachidesk.graphql.server.getAttribute
 import java.util.concurrent.CompletableFuture
 
 data class SyncConflictInfoType(
@@ -97,6 +101,30 @@ class ChapterType(
 
     fun manga(dataFetchingEnvironment: DataFetchingEnvironment): CompletableFuture<MangaType> =
         dataFetchingEnvironment.getValueFromDataLoader<Int, MangaType>("MangaDataLoader", mangaId)
+
+    fun isRead(dataFetchingEnvironment: DataFetchingEnvironment): Boolean =
+        UserChapterStateService.getOrLegacy(
+            dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser(),
+            id,
+        ).isRead
+
+    fun isBookmarked(dataFetchingEnvironment: DataFetchingEnvironment): Boolean =
+        UserChapterStateService.getOrLegacy(
+            dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser(),
+            id,
+        ).isBookmarked
+
+    fun lastPageRead(dataFetchingEnvironment: DataFetchingEnvironment): Int =
+        UserChapterStateService.getOrLegacy(
+            dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser(),
+            id,
+        ).lastPageRead
+
+    fun lastReadAt(dataFetchingEnvironment: DataFetchingEnvironment): Long =
+        UserChapterStateService.getOrLegacy(
+            dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser(),
+            id,
+        ).lastReadAt
 
     fun meta(dataFetchingEnvironment: DataFetchingEnvironment): CompletableFuture<List<ChapterMetaType>> =
         dataFetchingEnvironment.getValueFromDataLoader<Int, List<ChapterMetaType>>("ChapterMetaDataLoader", id)
