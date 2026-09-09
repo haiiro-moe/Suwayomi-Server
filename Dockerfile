@@ -34,6 +34,7 @@ RUN mkdir -p /data && chown -R suwairo:suwairo /app /data
 
 USER suwairo
 VOLUME ["/data"]
+VOLUME ["/branding"]
 EXPOSE 4567
 
 ENTRYPOINT ["java", "-Duser.home=/data", "-jar", "/app/suwairo-server.jar"]

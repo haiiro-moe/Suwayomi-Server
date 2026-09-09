@@ -181,6 +181,12 @@ object JavalinSetup {
     fun RoutesConfig.defineCore() {
         val loginPath = ServerSubpath.maybeAddAsPrefix("/login.html")
 
+        get(ServerSubpath.maybeAddAsPrefix("/brand/logo")) { ctx ->
+            val logo = BrandConfig.logoFile ?: throw NotFoundResponse()
+            ctx.contentType(BrandConfig.logoContentType)
+            ctx.result(logo.inputStream())
+        }
+
         get(loginPath) { ctx ->
             val locale: Locale = LocalizationHelper.ctxToLocale(ctx)
             ctx.header("content-type", "text/html")
@@ -190,6 +196,8 @@ object JavalinSetup {
                 "Login.jte",
                 mapOf(
                     "locale" to locale,
+                    "brandName" to BrandConfig.name,
+                    "logoUrl" to BrandConfig.logoFile?.let { ServerSubpath.maybeAddAsPrefix("/brand/logo") },
                     "error" to "",
                 ),
             )
@@ -223,6 +231,8 @@ object JavalinSetup {
                 "Login.jte",
                 mapOf(
                     "locale" to locale,
+                    "brandName" to BrandConfig.name,
+                    "logoUrl" to BrandConfig.logoFile?.let { ServerSubpath.maybeAddAsPrefix("/brand/logo") },
                     "error" to "Invalid username or password",
                 ),
             )
