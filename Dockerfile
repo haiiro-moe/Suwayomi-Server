@@ -10,8 +10,9 @@ RUN apt-get update \
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/bin/npm /usr/local/bin/npm
 COPY --from=node /usr/local/bin/npx /usr/local/bin/npx
-COPY --from=node /usr/local/bin/pnpm /usr/local/bin/pnpm
+COPY --from=node /usr/local/bin/corepack /usr/local/bin/corepack
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
 
 WORKDIR /workspace
 COPY . .
