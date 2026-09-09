@@ -7,7 +7,9 @@ import suwayomi.tachidesk.global.impl.util.Jwt
 import suwayomi.tachidesk.graphql.server.getAttribute
 import suwayomi.tachidesk.server.JavalinSetup.Attribute
 import suwayomi.tachidesk.server.serverConfig
+import suwayomi.tachidesk.server.user.UserService
 import suwayomi.tachidesk.server.user.UserType
+
 
 class UserMutation {
     data class LoginInput(
@@ -29,11 +31,14 @@ class UserMutation {
         if (dataFetchingEnvironment.getAttribute(Attribute.TachideskUser) !is UserType.Visitor) {
             throw IllegalArgumentException("Cannot login while already logged-in")
         }
-        val isValid =
-            input.username == serverConfig.authUsername.value &&
-                input.password == serverConfig.authPassword.value
-        if (isValid) {
-            val jwt = Jwt.generateJwt()
+        val userId =
+            if (serverConfig.authMode.value == suwayomi.tachidesk.graphql.types.AuthMode.UI_LOGIN) {
+                UserService.authenticate(input.username, input.password)
+            } else {
+                if (input.username == serverConfig.authUsername.value && input.password == serverConfig.authPassword.value) 1 else null
+            }
+        if (userId != null) {
+            val jwt = Jwt.generateJwt(userId)
             return LoginPayload(
                 clientMutationId = input.clientMutationId,
                 accessToken = jwt.accessToken,

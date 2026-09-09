@@ -333,6 +333,7 @@ fun applicationSetup() {
         runMigrations(applicationDirs) {
             databaseUp()
         }
+        suwayomi.tachidesk.server.user.UserService.ensureBootstrapUser()
     }
 
     try {

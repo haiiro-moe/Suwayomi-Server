@@ -64,9 +64,9 @@ object Jwt {
         val refreshToken: String,
     )
 
-    fun generateJwt(): JwtTokens {
-        val accessToken = createAccessToken()
-        val refreshToken = createRefreshToken()
+    fun generateJwt(userId: Int = 1): JwtTokens {
+        val accessToken = createAccessToken(userId)
+        val refreshToken = createRefreshToken(userId)
 
         return JwtTokens(
             accessToken = accessToken,
@@ -82,7 +82,8 @@ object Jwt {
         require(jwt.audience.single() == AUDIENCE) {
             "Token intended for different audience ${jwt.audience}"
         }
-        return createAccessToken()
+        val userId = jwt.getClaim("user_id").asInt() ?: error("Token has no user id")
+        return createAccessToken(userId)
     }
 
     fun verifyJwt(jwt: String): UserType {
@@ -96,17 +97,19 @@ object Jwt {
                 "Token intended for different audience ${decodedJWT.audience}"
             }
 
-            return UserType.Admin(1)
+            val userId = decodedJWT.getClaim("user_id").asInt() ?: return UserType.Visitor
+            return UserType.Admin(userId)
         } catch (e: JWTVerificationException) {
             logger.warn(e) { "Received invalid token" }
             return UserType.Visitor
         }
     }
 
-    private fun createAccessToken(): String {
+    private fun createAccessToken(userId: Int): String {
         val jwt =
             JWT
                 .create()
+                .withClaim("user_id", userId)
                 .withIssuer(ISSUER)
                 .withAudience(AUDIENCE)
                 .withClaim("token_type", "access")
@@ -115,9 +118,10 @@ object Jwt {
         return jwt.sign(algorithm)
     }
 
-    private fun createRefreshToken(): String =
+    private fun createRefreshToken(userId: Int): String =
         JWT
             .create()
+            .withClaim("user_id", userId)
             .withIssuer(ISSUER)
             .withAudience(AUDIENCE)
             .withClaim("token_type", "refresh")
