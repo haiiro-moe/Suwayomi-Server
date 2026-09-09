@@ -253,15 +253,19 @@ tasks {
         val revisionFile = layout.buildDirectory.file("webui-revision")
         doFirst {
             val revision =
-                ProcessBuilder("git", "-C", rootProject.file("WebUI").absolutePath, "rev-list", "HEAD", "--count")
-                    .start()
-                    .let { process ->
-                        process.waitFor()
-                        process.inputStream.bufferedReader().use { it.readText().trim() }
-                    }
+                System.getenv("WEBUI_REVISION")
+                    ?: runCatching {
+                        ProcessBuilder("git", "-C", rootProject.file("WebUI").absolutePath, "rev-list", "HEAD", "--count")
+                            .start()
+                            .let { process ->
+                                process.waitFor()
+                                process.inputStream.bufferedReader().use { it.readText().trim() }
+                            }
+                    }.getOrNull()?.takeIf { it.isNotBlank() }?.let { "r$it" }
+                    ?: webUIRevisionTag
             revisionFile.get().asFile.apply {
                 parentFile.mkdirs()
-                writeText("r$revision")
+                writeText(revision)
             }
         }
         from(rootProject.file("WebUI/build"))

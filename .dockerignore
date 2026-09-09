@@ -1,0 +1,9 @@
+.git
+.gradle
+.idea
+.kotlin
+**/build
+**/node_modules
+server/src/main/resources/WebUI.zip
+.DS_Store
+docs/suwairo
