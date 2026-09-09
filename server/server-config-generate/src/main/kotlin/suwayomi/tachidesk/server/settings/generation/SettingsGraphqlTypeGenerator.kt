@@ -3,6 +3,9 @@ package suwayomi.tachidesk.server.settings.generation
 import suwayomi.tachidesk.server.settings.SettingsRegistry
 import java.io.File
 
+private fun settingPermission(group: String): String =
+    "settings.${group.lowercase().replace(' ', '_').replace('/', '_')}"
+
 object SettingsGraphqlTypeGenerator {
     fun generate(
         settings: Map<String, SettingsRegistry.SettingMetadata>,
@@ -103,6 +106,9 @@ object SettingsGraphqlTypeGenerator {
     ) {
         groupedSettings.forEach { (group, settings) ->
             appendLine("// $group".addIndentation(indentation))
+            if (asType && !isInterface && !isOverride) {
+                appendLine("@suwayomi.tachidesk.graphql.directives.RequirePermission(\"${settingPermission(group)}\")".addIndentation(indentation))
+            }
             settings.forEach { setting -> writeSetting(setting, indentation, asType, isOverride, isNullable, isInterface) }
         }
     }
