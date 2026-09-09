@@ -29,7 +29,11 @@ import suwayomi.tachidesk.graphql.types.ChapterNodeList
 import suwayomi.tachidesk.graphql.types.ChapterNodeList.Companion.toNodeList
 import suwayomi.tachidesk.graphql.types.ChapterType
 import suwayomi.tachidesk.manga.model.table.ChapterTable
+import suwayomi.tachidesk.graphql.server.getAttribute
+import suwayomi.tachidesk.server.JavalinSetup.Attribute
 import suwayomi.tachidesk.server.JavalinSetup.future
+import suwayomi.tachidesk.server.user.UserChapterStateService
+import suwayomi.tachidesk.server.user.requireUser
 
 class ChapterDataLoader : KotlinDataLoader<Int, ChapterType> {
     override val dataLoaderName = "ChapterDataLoader"
@@ -39,11 +43,18 @@ class ChapterDataLoader : KotlinDataLoader<Int, ChapterType> {
             future {
                 transaction {
                     addLogger(Slf4jSqlDebugLogger)
+                    val stateByChapterId =
+                        UserChapterStateService.getForUser(
+                            graphQLContext.getAttribute(Attribute.TachideskUser).requireUser(),
+                            ids,
+                        )
                     val chapters =
                         ChapterTable
                             .selectAll()
                             .where { ChapterTable.id inList ids }
-                            .map { ChapterType(it) }
+                            .map { row ->
+                                ChapterType(row).withUserState(stateByChapterId[row[ChapterTable.id].value])
+                            }
                             .associateBy { it.id }
                     ids.map { chapters[it] }
                 }
@@ -59,11 +70,16 @@ class ChaptersForMangaDataLoader : KotlinDataLoader<Int, ChapterNodeList> {
             future {
                 transaction {
                     addLogger(Slf4jSqlDebugLogger)
-                    val chaptersByMangaId =
+                    val userId = graphQLContext.getAttribute(Attribute.TachideskUser).requireUser()
+                    val rows =
                         ChapterTable
                             .selectAll()
                             .where { ChapterTable.manga inList ids }
-                            .map { ChapterType(it) }
+                            .toList()
+                    val stateByChapterId = UserChapterStateService.getForUser(userId, rows.map { it[ChapterTable.id].value })
+                    val chaptersByMangaId =
+                        rows
+                            .map { row -> ChapterType(row).withUserState(stateByChapterId[row[ChapterTable.id].value]) }
                             .groupBy { it.mangaId }
                     ids.map { (chaptersByMangaId[it] ?: emptyList()).toNodeList() }
                 }

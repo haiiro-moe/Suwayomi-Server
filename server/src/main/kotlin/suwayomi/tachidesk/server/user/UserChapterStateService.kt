@@ -2,6 +2,7 @@ package suwayomi.tachidesk.server.user
 
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
@@ -29,6 +30,18 @@ object UserChapterStateService {
                 }.firstOrNull()
                 ?.toState()
         }
+
+    fun getForUser(userId: Int, chapterIds: List<Int>): Map<Int, UserChapterState> {
+        if (chapterIds.isEmpty()) return emptyMap()
+        return transaction(DBManager.db) {
+            UserChapterStateTable
+                .selectAll()
+                .where {
+                    (UserChapterStateTable.user eq userId) and
+                        (UserChapterStateTable.chapter inList chapterIds)
+                }.associate { it[UserChapterStateTable.chapter].value to it.toState() }
+        }
+    }
 
     fun getOrLegacy(userId: Int, chapterId: Int): UserChapterState =
         get(userId, chapterId) ?: transaction(DBManager.db) {

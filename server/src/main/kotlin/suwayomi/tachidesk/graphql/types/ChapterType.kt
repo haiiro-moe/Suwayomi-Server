@@ -126,6 +126,15 @@ class ChapterType(
             id,
         ).lastReadAt
 
+    fun withUserState(state: suwayomi.tachidesk.server.user.UserChapterState?): ChapterType {
+        if (state == null) return this
+        return ChapterType(
+            id, url, name, uploadDate, chapterNumber, scanlator, mangaId,
+            state.isRead, state.isBookmarked, state.lastPageRead, state.lastReadAt,
+            sourceOrder, realUrl, fetchedAt, isDownloaded, pageCount,
+        )
+    }
+
     fun meta(dataFetchingEnvironment: DataFetchingEnvironment): CompletableFuture<List<ChapterMetaType>> =
         dataFetchingEnvironment.getValueFromDataLoader<Int, List<ChapterMetaType>>("ChapterMetaDataLoader", id)
 }
