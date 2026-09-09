@@ -7,10 +7,7 @@ FROM eclipse-temurin:25-jdk AS build
 RUN apt-get update \
     && apt-get install --no-install-recommends --yes git \
     && rm -rf /var/lib/apt/lists/*
-COPY --from=node /usr/local/bin/node /usr/local/bin/node
-COPY --from=node /usr/local/bin/npm /usr/local/bin/npm
-COPY --from=node /usr/local/bin/npx /usr/local/bin/npx
-COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
+COPY --from=node /usr/local/ /usr/local/
 RUN npm install --global pnpm@11.1.2
 
 WORKDIR /workspace
