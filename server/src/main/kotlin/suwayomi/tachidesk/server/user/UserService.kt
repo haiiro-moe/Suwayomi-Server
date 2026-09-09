@@ -94,6 +94,8 @@ object UserService {
                 }.count() > 0
         }
 
+    fun hashPasswordForAdmin(password: String): String = hashPassword(password)
+
     private fun hashPassword(password: String): String {
         val salt = ByteArray(SALT_BYTES).also(SecureRandom()::nextBytes)
         val hash = derive(password, salt)
