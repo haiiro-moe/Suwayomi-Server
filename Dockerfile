@@ -8,7 +8,8 @@ RUN apt-get update \
     && apt-get install --no-install-recommends --yes git \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=node /usr/local/ /usr/local/
-RUN npm install --global pnpm@11.1.2
+RUN rm -f /usr/local/bin/pnpm /usr/local/bin/pnpx \
+    && npm install --global pnpm@11.1.2
 
 WORKDIR /workspace
 COPY . .
