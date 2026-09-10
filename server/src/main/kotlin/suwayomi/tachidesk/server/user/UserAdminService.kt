@@ -61,19 +61,41 @@ object UserAdminService {
         }
     }
 
-    fun createUser(username: String, password: String, displayName: String, roleId: Int?): Int = transaction(DBManager.db) {
+    fun createUser(username: String, password: String, displayName: String, roleId: Int): Int = transaction(DBManager.db) {
         val normalizedUsername = username.trim()
         require(normalizedUsername.isNotEmpty()) { "Username must not be empty" }
         require(password.isNotEmpty()) { "Password must not be empty" }
-        if (roleId != null) {
-            require(RoleTable.selectAll().where { RoleTable.id eq roleId }.any()) { "Role does not exist" }
-        }
+        require(RoleTable.selectAll().where { RoleTable.id eq roleId }.any()) { "Role does not exist" }
+        require(UserTable.selectAll().where { UserTable.username eq normalizedUsername }.none()) { "Username is already in use" }
         UserTable.insertAndGetId {
             it[UserTable.username] = normalizedUsername
             it[UserTable.passwordHash] = UserService.hashPasswordForAdmin(password)
             it[UserTable.displayName] = displayName.trim().ifEmpty { normalizedUsername }
             it[UserTable.role] = roleId
         }.value
+    }
+
+    fun updateUser(userId: Int, displayName: String?, avatarUrl: String?, password: String?, enabled: Boolean?, roleId: Int?) {
+        transaction(DBManager.db) {
+            val user = UserTable.selectAll().where { UserTable.id eq userId }.firstOrNull()
+                ?: error("User does not exist")
+            val currentRoleName = user[UserTable.role]?.let { assignedRoleId ->
+                RoleTable.selectAll().where { RoleTable.id eq assignedRoleId }.firstOrNull()?.get(RoleTable.name)
+            }
+            if (roleId != null) {
+                require(RoleTable.selectAll().where { RoleTable.id eq roleId }.any()) { "Role does not exist" }
+                require(currentRoleName != "owner" || roleId == user[UserTable.role]?.value) { "The owner role cannot be changed" }
+            }
+            require(currentRoleName != "owner" || enabled != false) { "The owner user cannot be disabled" }
+            password?.let { require(it.isNotEmpty()) { "Password must not be empty" } }
+            UserTable.update({ UserTable.id eq userId }) {
+                displayName?.let { value -> it[UserTable.displayName] = value.trim().ifEmpty { user[UserTable.username] } }
+                avatarUrl?.let { value -> it[UserTable.avatarUrl] = value.trim().ifEmpty { null } }
+                password?.let { value -> it[UserTable.passwordHash] = UserService.hashPasswordForAdmin(value) }
+                enabled?.let { value -> it[UserTable.enabled] = value }
+                roleId?.let { value -> it[UserTable.role] = value }
+            }
+        }
     }
 
     fun deleteUser(userId: Int) {
@@ -89,7 +111,9 @@ object UserAdminService {
     }
 
     private fun validateRole(name: String, permissions: Set<String>) {
-        require(name.trim().isNotEmpty()) { "Role name must not be empty" }
+        val normalizedName = name.trim()
+        require(normalizedName.isNotEmpty()) { "Role name must not be empty" }
+        require(normalizedName != "owner") { "The owner role name is reserved" }
         require(permissions.all { it in PermissionNodes.catalog }) { "Unknown permission node" }
     }
 

@@ -9,7 +9,7 @@ class UserRoleAdminMutation {
         val username: String,
         val password: String,
         val displayName: String,
-        val roleId: Int? = null,
+        val roleId: Int,
     )
 
     data class UserAdminPayload(val clientMutationId: String?, val id: Int)

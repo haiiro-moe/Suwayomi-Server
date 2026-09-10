@@ -1,21 +1,18 @@
 package suwayomi.tachidesk.graphql.mutations
 
-import org.jetbrains.exposed.v1.core.eq
-import org.jetbrains.exposed.v1.jdbc.update
-import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import suwayomi.tachidesk.graphql.directives.RequirePermission
 import suwayomi.tachidesk.server.user.PermissionNodes
-import suwayomi.tachidesk.server.database.DBManager
-import suwayomi.tachidesk.server.user.UserService
-import suwayomi.tachidesk.server.user.model.UserTable
+import suwayomi.tachidesk.server.user.UserAdminService
 
 class UserAdminMutation {
 	data class UpdateUserInput(
+		val clientMutationId: String? = null,
 		val id: Int,
 		val displayName: String? = null,
 		val avatarUrl: String? = null,
 		val password: String? = null,
 		val enabled: Boolean? = null,
+		val roleId: Int? = null,
 	)
 
 	data class UpdateUserPayload(
@@ -25,14 +22,7 @@ class UserAdminMutation {
 
 	@RequirePermission(PermissionNodes.ADMIN_USERS_MANAGE)
 	fun updateUser(input: UpdateUserInput): UpdateUserPayload {
-		transaction(DBManager.db) {
-			UserTable.update({ UserTable.id eq input.id }) {
-				input.displayName?.let { value -> it[UserTable.displayName] = value }
-				input.avatarUrl?.let { value -> it[UserTable.avatarUrl] = value }
-				input.password?.let { value -> it[UserTable.passwordHash] = UserService.hashPasswordForAdmin(value) }
-				input.enabled?.let { value -> it[UserTable.enabled] = value }
-			}
-		}
-		return UpdateUserPayload(null, true)
+		UserAdminService.updateUser(input.id, input.displayName, input.avatarUrl, input.password, input.enabled, input.roleId)
+		return UpdateUserPayload(input.clientMutationId, true)
 	}
 }
