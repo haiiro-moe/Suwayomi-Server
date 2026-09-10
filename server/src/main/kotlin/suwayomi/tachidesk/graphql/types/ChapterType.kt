@@ -7,6 +7,7 @@
 
 package suwayomi.tachidesk.graphql.types
 
+import com.expediagroup.graphql.generator.annotations.GraphQLIgnore
 import com.expediagroup.graphql.server.extensions.getValueFromDataLoader
 import graphql.schema.DataFetchingEnvironment
 import org.jetbrains.exposed.v1.core.ResultRow
@@ -126,6 +127,7 @@ class ChapterType(
             id,
         ).lastReadAt
 
+    @GraphQLIgnore
     fun withUserState(state: suwayomi.tachidesk.server.user.UserChapterState?): ChapterType {
         if (state == null) return this
         return ChapterType(
