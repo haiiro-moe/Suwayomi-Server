@@ -40,6 +40,8 @@ import suwayomi.tachidesk.graphql.mutations.TrackMutation
 import suwayomi.tachidesk.graphql.mutations.UpdateMutation
 import suwayomi.tachidesk.graphql.mutations.UserAdminMutation
 import suwayomi.tachidesk.graphql.mutations.UserMutation
+import suwayomi.tachidesk.graphql.mutations.UserRoleAdminMutation
+import suwayomi.tachidesk.graphql.queries.RoleQuery
 import suwayomi.tachidesk.graphql.queries.UserQuery
 import suwayomi.tachidesk.graphql.mutations.WebviewMutation
 import suwayomi.tachidesk.graphql.queries.BackupQuery
@@ -124,6 +126,7 @@ object GraphQLSchemaProvider {
                         TopLevelObject(SyncQuery()),
                         TopLevelObject(TrackQuery()),
                         TopLevelObject(UpdateQuery()),
+                        TopLevelObject(RoleQuery()),
                         TopLevelObject(UserQuery()),
                     ),
                 mutations =
@@ -131,6 +134,7 @@ object GraphQLSchemaProvider {
                         TopLevelObject(BackupMutation()),
                         TopLevelObject(CategoryAccessMutation()),
                         TopLevelObject(UserAdminMutation()),
+                        TopLevelObject(UserRoleAdminMutation()),
                         TopLevelObject(CategoryMutation()),
                         TopLevelObject(ChapterMutation()),
                         TopLevelObject(DownloadMutation()),

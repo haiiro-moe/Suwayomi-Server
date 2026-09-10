@@ -28,5 +28,33 @@ object PermissionNodes {
     const val SETTINGS_WEB_VIEW = "settings.web_view"
     const val SETTINGS_SYNCYOMI = "settings.syncyomi"
 
+    val catalog: Set<String> = setOf(
+        LIBRARY_READ,
+        LIBRARY_CATEGORY_READ,
+        LIBRARY_CATEGORY_EDIT,
+        UPDATES_READ,
+        UPDATES_TRIGGER,
+        UPDATES_MANAGE_CRON,
+        SETTINGS_EDIT,
+        ADMIN_USERS_MANAGE,
+        ADMIN_ROLES_MANAGE,
+        SETTINGS_NETWORK,
+        SETTINGS_DATABASE,
+        SETTINGS_PROXY,
+        SETTINGS_WEB_UI,
+        SETTINGS_DOWNLOADER,
+        SETTINGS_EXTENSION,
+        SETTINGS_LIBRARY_UPDATES,
+        SETTINGS_AUTH,
+        SETTINGS_MISC,
+        SETTINGS_BACKUP,
+        SETTINGS_LOCAL_SOURCE,
+        SETTINGS_CLOUDFLARE,
+        SETTINGS_OPDS,
+        SETTINGS_KOREADER_SYNC,
+        SETTINGS_WEB_VIEW,
+        SETTINGS_SYNCYOMI,
+    )
+
     fun forGroup(group: String): String = "settings.${group.lowercase().replace(' ', '_').replace('/', '_')}"
 }
