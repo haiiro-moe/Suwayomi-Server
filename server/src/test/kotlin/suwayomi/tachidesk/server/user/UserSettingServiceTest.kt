@@ -21,4 +21,19 @@ class UserSettingServiceTest : ApplicationTest() {
             UserSettingService.set(userId, mapOf("serverPort" to "4567"))
         }
     }
+
+    @Test
+    fun `missing user is rejected`() {
+        assertFailsWith<IllegalArgumentException> {
+            UserSettingService.read(Int.MAX_VALUE)
+        }
+    }
+
+    @Test
+    fun `reset removes user settings`() {
+        val userId = UserService.ownerUserId() ?: error("Owner user missing")
+        UserSettingService.set(userId, mapOf("themeMode" to "dark"))
+        UserSettingService.reset(userId)
+        assertEquals(emptyMap(), UserSettingService.read(userId))
+    }
 }
