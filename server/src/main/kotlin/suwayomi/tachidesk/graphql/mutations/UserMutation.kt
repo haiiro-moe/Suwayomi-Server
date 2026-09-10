@@ -8,6 +8,7 @@ import suwayomi.tachidesk.graphql.directives.RequireAuth
 import suwayomi.tachidesk.graphql.server.getAttribute
 import suwayomi.tachidesk.server.JavalinSetup.Attribute
 import suwayomi.tachidesk.server.serverConfig
+import suwayomi.tachidesk.server.user.UserMessageService
 import suwayomi.tachidesk.server.user.UserProfileService
 import suwayomi.tachidesk.server.user.UserService
 import suwayomi.tachidesk.server.user.UserType
@@ -90,6 +91,37 @@ class UserMutation {
     fun removeFavorite(dataFetchingEnvironment: DataFetchingEnvironment, input: FavoriteMangaInput): ProfileMutationPayload {
         val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
         UserProfileService.removeFavorite(userId, input.mangaId)
+        return ProfileMutationPayload(input.clientMutationId, true)
+    }
+
+    data class SendMessageInput(
+        val clientMutationId: String? = null,
+        val receiverId: Int,
+        val content: String,
+        val parentId: Int? = null,
+    )
+
+    data class MessageMutationPayload(
+        val clientMutationId: String?,
+        val messageId: Int,
+    )
+
+    @RequireAuth
+    fun sendMessage(dataFetchingEnvironment: DataFetchingEnvironment, input: SendMessageInput): MessageMutationPayload {
+        val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
+        val message = UserMessageService.send(userId, input.receiverId, input.content, input.parentId)
+        return MessageMutationPayload(input.clientMutationId, message.id)
+    }
+
+    data class MarkMessageReadInput(
+        val clientMutationId: String? = null,
+        val messageId: Int,
+    )
+
+    @RequireAuth
+    fun markMessageRead(dataFetchingEnvironment: DataFetchingEnvironment, input: MarkMessageReadInput): ProfileMutationPayload {
+        val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
+        UserMessageService.markRead(userId, input.messageId)
         return ProfileMutationPayload(input.clientMutationId, true)
     }
 

@@ -7,6 +7,7 @@ import suwayomi.tachidesk.graphql.directives.RequireAuth
 import suwayomi.tachidesk.graphql.directives.RequirePermission
 import suwayomi.tachidesk.server.database.DBManager
 import suwayomi.tachidesk.server.user.model.RoleTable
+import suwayomi.tachidesk.server.user.UserMessageService
 import suwayomi.tachidesk.server.user.UserProfileService
 import suwayomi.tachidesk.server.user.UserType
 import suwayomi.tachidesk.server.user.model.UserTable
@@ -26,6 +27,30 @@ class UserQuery {
         val description: String = "",
         val favoriteMangaIds: List<Int> = emptyList(),
     )
+
+    data class MessageType(
+        val id: Int,
+        val senderId: Int,
+        val receiverId: Int,
+        val parentId: Int?,
+        val content: String,
+        val createdAt: Long,
+        val readAt: Long?,
+    )
+
+    @RequireAuth
+    fun conversation(dataFetchingEnvironment: DataFetchingEnvironment, otherUserId: Int): List<MessageType> {
+        val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
+        return UserMessageService.conversation(userId, otherUserId).map {
+            MessageType(it.id, it.senderId, it.receiverId, it.parentId, it.content, it.createdAt, it.readAt)
+        }
+    }
+
+    @RequireAuth
+    fun unreadMessageCount(dataFetchingEnvironment: DataFetchingEnvironment): Long {
+        val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
+        return UserMessageService.unreadCount(userId)
+    }
 
     @RequireAuth
     fun currentUserProfile(dataFetchingEnvironment: DataFetchingEnvironment): UserProfile? {
