@@ -13,6 +13,7 @@ import suwayomi.tachidesk.manga.model.table.MangaTable
 import suwayomi.tachidesk.server.database.DBManager
 import suwayomi.tachidesk.server.user.model.UserFavoriteTable
 import suwayomi.tachidesk.server.user.model.UserProfileTable
+import suwayomi.tachidesk.server.user.model.UserTable
 
 object UserProfileService {
     fun description(userId: Int): String = transaction(DBManager.db) {
@@ -55,12 +56,57 @@ object UserProfileService {
         }
     }
 
-    fun favoriteMangaIds(userId: Int): List<Int> = transaction(DBManager.db) {
-        val visible = CategoryAccessService.readableMangaIds(userId)
+    fun favoriteMangaIds(userId: Int): List<Int> = favoriteMangaIdsForViewer(userId, userId)
+
+    fun favoriteMangaIdsForViewer(viewerId: Int, profileUserId: Int): List<Int> = transaction(DBManager.db) {
+        val visible = CategoryAccessService.readableMangaIds(viewerId)
         if (visible.isEmpty()) return@transaction emptyList()
         UserFavoriteTable
             .select(UserFavoriteTable.manga)
-            .where { (UserFavoriteTable.user eq userId) and (UserFavoriteTable.manga inList visible) }
+            .where { (UserFavoriteTable.user eq profileUserId) and (UserFavoriteTable.manga inList visible) }
             .map { it[UserFavoriteTable.manga].value }
+    }
+
+    fun publicProfile(viewerId: Int, profileUserId: Int): PublicProfile? = transaction(DBManager.db) {
+        UserTable
+            .selectAll()
+            .where { UserTable.id eq profileUserId and (UserTable.enabled eq true) }
+            .firstOrNull()
+            ?.let { row ->
+                PublicProfile(
+                    id = row[UserTable.id].value,
+                    username = row[UserTable.username],
+                    displayName = row[UserTable.displayName],
+                    avatarUrl = row[UserTable.avatarUrl],
+                    description = description(profileUserId),
+                    favoriteMangaIds = favoriteMangaIdsForViewer(viewerId, profileUserId),
+                )
+            }
+    }
+
+    data class PublicProfile(
+        val id: Int,
+        val username: String,
+        val displayName: String,
+        val avatarUrl: String?,
+        val description: String,
+        val favoriteMangaIds: List<Int>,
+    )
+
+    fun directory(): List<PublicProfile> = transaction(DBManager.db) {
+        UserTable
+            .selectAll()
+            .where { UserTable.enabled eq true }
+            .orderBy(UserTable.username)
+            .map { row ->
+                PublicProfile(
+                    id = row[UserTable.id].value,
+                    username = row[UserTable.username],
+                    displayName = row[UserTable.displayName],
+                    avatarUrl = row[UserTable.avatarUrl],
+                    description = description(row[UserTable.id].value),
+                    favoriteMangaIds = emptyList(),
+                )
+            }
     }
 }

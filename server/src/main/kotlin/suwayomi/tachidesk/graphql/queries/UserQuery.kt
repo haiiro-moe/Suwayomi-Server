@@ -53,6 +53,28 @@ class UserQuery {
     }
 
     @RequireAuth
+    fun userDirectory(): List<UserProfile> =
+        UserProfileService.directory().map { profile ->
+            UserProfile(profile.id, profile.username, profile.displayName, profile.avatarUrl, "public", profile.description)
+        }
+
+    @RequireAuth
+    fun profile(dataFetchingEnvironment: DataFetchingEnvironment, userId: Int): UserProfile? {
+        val viewerId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
+        return UserProfileService.publicProfile(viewerId, userId)?.let { publicProfile ->
+            UserProfile(
+                publicProfile.id,
+                publicProfile.username,
+                publicProfile.displayName,
+                publicProfile.avatarUrl,
+                "public",
+                publicProfile.description,
+                publicProfile.favoriteMangaIds,
+            )
+        }
+    }
+
+    @RequireAuth
     fun currentUserProfile(dataFetchingEnvironment: DataFetchingEnvironment): UserProfile? {
         val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
         return currentUser(userId)?.copy(
