@@ -70,10 +70,15 @@ open class ConfigManager {
 
         // Load user config
         val userConfig = getUserConfig()
+        val environmentConfig =
+            System.getenv("SUWAIRO_AUTH_MODE")?.trim()?.takeIf { it.isNotEmpty() }?.let {
+                ConfigFactory.parseString("server.authMode = ${it.uppercase()}")
+            } ?: ConfigFactory.empty()
 
         val config =
             ConfigFactory
                 .empty()
+                .withFallback(environmentConfig)
                 .withFallback(baseConfig)
                 .withFallback(userConfig)
                 .withFallback(compatConfig)
