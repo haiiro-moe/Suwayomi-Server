@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7-labs
+
 FROM node:24-bookworm AS node
 
 RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
@@ -8,13 +10,22 @@ COPY --from=node /usr/local/ /usr/local/
 RUN rm -f /usr/local/bin/pnpm /usr/local/bin/pnpx \
     && npm install --global pnpm@11.1.2
 
-ENV GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx3g -Dkotlin.daemon.jvm.options=-Xmx3g"
+ENV GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx3g -Dkotlin.daemon.jvm.options=-Xmx3g" \
+    PNPM_STORE_DIR=/pnpm/store
 
 WORKDIR /workspace
+
+# Keep the frontend dependency layer independent from WebUI source changes.
+COPY WebUI/package.json WebUI/pnpm-lock.yaml WebUI/pnpm-workspace.yaml WebUI/
+RUN --mount=type=cache,id=suwairo-pnpm-store,target=/pnpm/store \
+    pnpm install --dir WebUI --frozen-lockfile --store-dir=/pnpm/store
+
 COPY . .
 
 ENV WEBUI_REVISION=r3484
-RUN ./gradlew :server:shadowJar --no-daemon
+RUN --mount=type=cache,id=suwairo-gradle-cache,target=/root/.gradle \
+    --mount=type=cache,id=suwairo-pnpm-store,target=/pnpm/store \
+    ./gradlew :server:shadowJar --no-daemon
 
 FROM eclipse-temurin:25-jre
 
