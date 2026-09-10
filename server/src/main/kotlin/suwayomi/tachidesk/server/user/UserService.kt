@@ -25,8 +25,8 @@ private const val HASH_BYTES = 32
 private const val SALT_BYTES = 16
 
 object UserService {
-    fun ensureBootstrapUser() {
-        transaction(DBManager.db) {
+    fun ensureBootstrapUser(): Int {
+        return transaction(DBManager.db) {
             val ownerRole =
                 RoleTable
                     .selectAll()
@@ -46,12 +46,14 @@ object UserService {
                     .firstOrNull()
 
             if (existingUser == null) {
-                UserTable.insert {
+                UserTable.insertAndGetId {
                     it[UserTable.username] = username
                     it[passwordHash] = hashPassword(serverConfig.authPassword.value)
                     it[displayName] = username
                     it[role] = ownerRole
-                }
+                }.value
+            } else {
+                existingUser[UserTable.id].value
             }
         }
     }

@@ -43,21 +43,35 @@ object UserChapterStateService {
         }
     }
 
-    fun getOrLegacy(userId: Int, chapterId: Int): UserChapterState =
-        get(userId, chapterId) ?: transaction(DBManager.db) {
-            ChapterTable
-                .selectAll()
-                .where { ChapterTable.id eq chapterId }
-                .firstOrNull()
-                ?.let {
-                    UserChapterState(
-                        it[ChapterTable.isRead],
-                        it[ChapterTable.isBookmarked],
-                        it[ChapterTable.lastPageRead],
-                        it[ChapterTable.lastReadAt],
-                    )
+    fun getOrDefault(userId: Int, chapterId: Int): UserChapterState =
+        get(userId, chapterId) ?: UserChapterState(false, false, 0, 0)
+
+    @Deprecated("Legacy shared chapter state must not be exposed across users")
+    fun getOrLegacy(userId: Int, chapterId: Int): UserChapterState = getOrDefault(userId, chapterId)
+
+    fun migrateLegacyStateToOwner(ownerId: Int) {
+        transaction(DBManager.db) {
+            ChapterTable.selectAll().forEach { row ->
+                val chapterId = row[ChapterTable.id].value
+                if (UserChapterStateTable.selectAll().where {
+                    (UserChapterStateTable.user eq ownerId) and
+                        (UserChapterStateTable.chapter eq chapterId)
+                }.empty()) {
+                    if (row[ChapterTable.isRead] || row[ChapterTable.isBookmarked] ||
+                        row[ChapterTable.lastPageRead] > 0 || row[ChapterTable.lastReadAt] > 0) {
+                        UserChapterStateTable.insert {
+                            it[user] = ownerId
+                            it[chapter] = chapterId
+                            it[isRead] = row[ChapterTable.isRead]
+                            it[isBookmarked] = row[ChapterTable.isBookmarked]
+                            it[lastPageRead] = row[ChapterTable.lastPageRead]
+                            it[lastReadAt] = row[ChapterTable.lastReadAt]
+                        }
+                    }
                 }
-        } ?: UserChapterState(false, false, 0, 0)
+            }
+        }
+    }
 
     fun update(userId: Int, chapterId: Int, read: Boolean?, bookmarked: Boolean?, lastPageRead: Int?) {
         transaction(DBManager.db) {
@@ -68,7 +82,7 @@ object UserChapterStateService {
                         (UserChapterStateTable.user eq userId) and
                             (UserChapterStateTable.chapter eq chapterId)
                     }.firstOrNull()
-            val current = existing?.toState() ?: getOrLegacy(userId, chapterId)
+            val current = existing?.toState() ?: getOrDefault(userId, chapterId)
             val now = if (lastPageRead != null || read != null) Instant.now().epochSecond else current.lastReadAt
             if (existing == null) {
                 UserChapterStateTable.insert {

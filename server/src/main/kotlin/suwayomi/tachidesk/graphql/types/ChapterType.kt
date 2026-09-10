@@ -104,25 +104,25 @@ class ChapterType(
         dataFetchingEnvironment.getValueFromDataLoader<Int, MangaType>("MangaDataLoader", mangaId)
 
     fun isRead(dataFetchingEnvironment: DataFetchingEnvironment): Boolean =
-        UserChapterStateService.getOrLegacy(
+        UserChapterStateService.getOrDefault(
             dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser(),
             id,
         ).isRead
 
     fun isBookmarked(dataFetchingEnvironment: DataFetchingEnvironment): Boolean =
-        UserChapterStateService.getOrLegacy(
+        UserChapterStateService.getOrDefault(
             dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser(),
             id,
         ).isBookmarked
 
     fun lastPageRead(dataFetchingEnvironment: DataFetchingEnvironment): Int =
-        UserChapterStateService.getOrLegacy(
+        UserChapterStateService.getOrDefault(
             dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser(),
             id,
         ).lastPageRead
 
     fun lastReadAt(dataFetchingEnvironment: DataFetchingEnvironment): Long =
-        UserChapterStateService.getOrLegacy(
+        UserChapterStateService.getOrDefault(
             dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser(),
             id,
         ).lastReadAt
