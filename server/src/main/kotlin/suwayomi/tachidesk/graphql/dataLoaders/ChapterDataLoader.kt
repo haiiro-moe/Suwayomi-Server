@@ -32,8 +32,12 @@ import suwayomi.tachidesk.manga.model.table.ChapterTable
 import suwayomi.tachidesk.graphql.server.getAttribute
 import suwayomi.tachidesk.server.JavalinSetup.Attribute
 import suwayomi.tachidesk.server.JavalinSetup.future
+import suwayomi.tachidesk.server.user.CategoryAccessService
 import suwayomi.tachidesk.server.user.UserChapterStateService
 import suwayomi.tachidesk.server.user.requireUser
+
+private fun visibleMangaIds(userId: Int, ids: List<Int>): List<Int> =
+    ids.intersect(CategoryAccessService.readableMangaIds(userId).toSet()).toList()
 
 class ChapterDataLoader : KotlinDataLoader<Int, ChapterType> {
     override val dataLoaderName = "ChapterDataLoader"
@@ -43,15 +47,19 @@ class ChapterDataLoader : KotlinDataLoader<Int, ChapterType> {
             future {
                 transaction {
                     addLogger(Slf4jSqlDebugLogger)
-                    val stateByChapterId =
-                        UserChapterStateService.getForUser(
-                            graphQLContext.getAttribute(Attribute.TachideskUser).requireUser(),
-                            ids,
-                        )
+                    val userId = graphQLContext.getAttribute(Attribute.TachideskUser).requireUser()
+                    val visibleIds =
+                        ChapterTable
+                            .select(ChapterTable.id)
+                            .where { ChapterTable.manga inList CategoryAccessService.readableMangaIds(userId) }
+                            .map { it[ChapterTable.id].value }
+                            .intersect(ids.toSet())
+                            .toList()
+                    val stateByChapterId = UserChapterStateService.getForUser(userId, visibleIds)
                     val chapters =
                         ChapterTable
                             .selectAll()
-                            .where { ChapterTable.id inList ids }
+                            .where { ChapterTable.id inList visibleIds }
                             .map { row ->
                                 ChapterType(row).withUserState(stateByChapterId[row[ChapterTable.id].value])
                             }
@@ -74,7 +82,7 @@ class ChaptersForMangaDataLoader : KotlinDataLoader<Int, ChapterNodeList> {
                     val rows =
                         ChapterTable
                             .selectAll()
-                            .where { ChapterTable.manga inList ids }
+                            .where { ChapterTable.manga inList visibleMangaIds(userId, ids) }
                             .toList()
                     val stateByChapterId = UserChapterStateService.getForUser(userId, rows.map { it[ChapterTable.id].value })
                     val chaptersByMangaId =

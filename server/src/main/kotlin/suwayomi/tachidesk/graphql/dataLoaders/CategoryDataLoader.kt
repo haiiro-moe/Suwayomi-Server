@@ -12,6 +12,7 @@ import graphql.GraphQLContext
 import org.dataloader.DataLoader
 import org.dataloader.DataLoaderFactory
 import org.jetbrains.exposed.v1.core.Slf4jSqlDebugLogger
+import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
@@ -20,7 +21,11 @@ import suwayomi.tachidesk.graphql.types.CategoryNodeList.Companion.toNodeList
 import suwayomi.tachidesk.graphql.types.CategoryType
 import suwayomi.tachidesk.manga.model.table.CategoryMangaTable
 import suwayomi.tachidesk.manga.model.table.CategoryTable
+import suwayomi.tachidesk.graphql.server.getAttribute
+import suwayomi.tachidesk.server.JavalinSetup.Attribute
 import suwayomi.tachidesk.server.JavalinSetup.future
+import suwayomi.tachidesk.server.user.CategoryAccessService
+import suwayomi.tachidesk.server.user.requireUser
 
 class CategoryDataLoader : KotlinDataLoader<Int, CategoryType> {
     override val dataLoaderName = "CategoryDataLoader"
@@ -30,10 +35,12 @@ class CategoryDataLoader : KotlinDataLoader<Int, CategoryType> {
             future {
                 transaction {
                     addLogger(Slf4jSqlDebugLogger)
+                    val userId = graphQLContext.getAttribute(Attribute.TachideskUser).requireUser()
+                    val readableCategoryIds = CategoryAccessService.readableCategoryIds(userId)
                     val categories =
                         CategoryTable
                             .selectAll()
-                            .where { CategoryTable.id inList ids }
+                            .where { (CategoryTable.id inList ids) and (CategoryTable.id inList readableCategoryIds) }
                             .map { CategoryType(it) }
                             .associateBy { it.id }
                     ids.map { categories[it] }
