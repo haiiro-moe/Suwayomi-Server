@@ -10,6 +10,7 @@ import suwayomi.tachidesk.server.database.DBManager
 import suwayomi.tachidesk.server.user.model.RoleTable
 import suwayomi.tachidesk.server.user.UserMessageService
 import suwayomi.tachidesk.server.user.UserProfileService
+import suwayomi.tachidesk.server.user.UserService
 import suwayomi.tachidesk.server.user.UserType
 import suwayomi.tachidesk.server.user.model.UserTable
 import graphql.schema.DataFetchingEnvironment
@@ -27,6 +28,7 @@ class UserQuery {
         val role: String,
         val description: String = "",
         val favoriteMangaIds: List<Int> = emptyList(),
+        val permissions: Set<String> = emptySet(),
     )
 
     data class MessageType(
@@ -81,6 +83,7 @@ class UserQuery {
         return currentUser(userId)?.copy(
             description = UserProfileService.description(userId),
             favoriteMangaIds = UserProfileService.favoriteMangaIds(userId),
+            permissions = UserService.permissionsFor(userId),
         )
     }
 

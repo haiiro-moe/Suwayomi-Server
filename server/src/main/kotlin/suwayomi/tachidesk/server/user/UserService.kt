@@ -83,6 +83,27 @@ object UserService {
             user[UserTable.id].value
         }
 
+    fun permissionsFor(userId: Int): Set<String> =
+        transaction(DBManager.db) {
+            val roleName =
+                UserTable
+                    .innerJoin(RoleTable)
+                    .selectAll()
+                    .where { UserTable.id eq userId }
+                    .firstOrNull()
+                    ?.get(RoleTable.name)
+            if (roleName == OWNER_ROLE) {
+                return@transaction PermissionNodes.catalog
+            }
+            RolePermissionTable
+                .innerJoin(UserTable)
+                .innerJoin(PermissionTable)
+                .selectAll()
+                .where { UserTable.id eq userId }
+                .map { it[PermissionTable.node] }
+                .toSet()
+        }
+
     fun hasPermission(userId: Int, node: String): Boolean =
         transaction(DBManager.db) {
             val userRole =
