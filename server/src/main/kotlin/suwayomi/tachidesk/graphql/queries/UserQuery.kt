@@ -28,7 +28,7 @@ class UserQuery {
         val role: String,
         val description: String = "",
         val favoriteMangaIds: List<Int> = emptyList(),
-        val permissions: Set<String> = emptySet(),
+        val permissions: List<String> = emptyList(),
     )
 
     data class MessageType(
@@ -83,7 +83,7 @@ class UserQuery {
         return currentUser(userId)?.copy(
             description = UserProfileService.description(userId),
             favoriteMangaIds = UserProfileService.favoriteMangaIds(userId),
-            permissions = UserService.permissionsFor(userId),
+            permissions = UserService.permissionsFor(userId).sorted(),
         )
     }
 
