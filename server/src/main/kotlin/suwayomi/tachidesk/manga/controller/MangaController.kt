@@ -33,6 +33,7 @@ import suwayomi.tachidesk.server.JavalinSetup.getAttribute
 import suwayomi.tachidesk.server.serverConfig
 import suwayomi.tachidesk.server.user.PermissionNodes
 import suwayomi.tachidesk.server.user.requirePermission
+import suwayomi.tachidesk.server.user.requireUser
 import suwayomi.tachidesk.server.user.requireUserWithBasicFallback
 import suwayomi.tachidesk.server.util.formParam
 import suwayomi.tachidesk.server.util.handler
@@ -396,8 +397,8 @@ object MangaController {
                 }
             },
             behaviorOf = { ctx, mangaId, chapterIndex, read, bookmarked, markPrevRead, lastPageRead ->
-                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_READ)
-                val chapterId = Chapter.modifyChapter(mangaId, chapterIndex, read, bookmarked, markPrevRead, lastPageRead)
+                val userId = ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_READ)
+                val chapterId = Chapter.modifyChapterForUser(userId, mangaId, chapterIndex, read, bookmarked, markPrevRead, lastPageRead)
 
                 // Sync with KoreaderSync when progress is updated
                 if (lastPageRead != null || read == true) {
@@ -481,7 +482,7 @@ object MangaController {
                 }
             },
             behaviorOf = { ctx, mangaId, chapterIndex, index, updateProgress, format, opds ->
-                if (opds == true) {
+                val userId = if (opds == true) {
                     ctx.getAttribute(Attribute.TachideskUser).requireUserWithBasicFallback(ctx)
                 } else {
                     ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_READ)
@@ -502,7 +503,7 @@ object MangaController {
                         ctx.result(it.first)
 
                         if (updateProgress == true) {
-                            val chapterId = Chapter.updateChapterProgress(mangaId, chapterIndex, pageNo = index)
+                            val chapterId = Chapter.updateChapterProgressForUser(userId, mangaId, chapterIndex, pageNo = index)
                             // Sync progress with KoreaderSync if chapter update was successful
                             if (chapterId != -1) {
                                 GlobalScope.launch { KoreaderSyncService.pushProgress(chapterId) }
