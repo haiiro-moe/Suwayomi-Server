@@ -1,6 +1,16 @@
 package suwayomi.tachidesk.server.user
 
 object PermissionNodes {
+    const val LIBRARY_READ = "library.read"
+    const val LIBRARY_CATEGORY_READ = "library.category.read"
+    const val LIBRARY_CATEGORY_EDIT = "library.category.edit"
+    const val UPDATES_READ = "updates.read"
+    const val UPDATES_TRIGGER = "updates.trigger"
+    const val UPDATES_MANAGE_CRON = "updates.manage_cron"
+    const val SETTINGS_EDIT = "settings.edit"
+    const val ADMIN_USERS_MANAGE = "admin.users.manage"
+    const val ADMIN_ROLES_MANAGE = "admin.roles.manage"
+
     const val SETTINGS_NETWORK = "settings.network"
     const val SETTINGS_DATABASE = "settings.database"
     const val SETTINGS_PROXY = "settings.proxy"

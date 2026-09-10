@@ -375,24 +375,6 @@ class Updater : IUpdater {
                     .asSequence()
                     .filter { it.updateStrategy == UpdateStrategy.ALWAYS_UPDATE }
                     .filter {
-                        if (serverConfig.excludeUnreadChapters.value) {
-                            (it.unreadCount ?: 0L) == 0L
-                        } else {
-                            true
-                        }
-                    }.filter {
-                        if (it.initialized && serverConfig.excludeNotStarted.value) {
-                            it.lastReadAt != null
-                        } else {
-                            true
-                        }
-                    }.filter {
-                        if (serverConfig.excludeCompleted.value) {
-                            it.status != MangaStatus.COMPLETED.name
-                        } else {
-                            true
-                        }
-                    }.filter {
                         forceAll ||
                             !excludedCategories.any { category ->
                                 mangasToCategoriesMap[it.id]?.contains(category) == true
