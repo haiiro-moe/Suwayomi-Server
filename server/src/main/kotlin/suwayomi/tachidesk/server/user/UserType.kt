@@ -23,6 +23,14 @@ fun UserType.requireUser(): Int =
         UserType.Visitor -> throw UnauthorizedException()
     }
 
+fun UserType.requirePermission(node: String): Int {
+    val userId = requireUser()
+    if (!UserService.hasPermission(userId, node)) {
+        throw ForbiddenException()
+    }
+    return userId
+}
+
 fun UserType.requireUserWithBasicFallback(ctx: Context): Int =
     when (this) {
         is UserType.Admin -> {
