@@ -68,6 +68,25 @@ object UserService {
                 ?.value
         }
 
+    fun isEnabled(userId: Int): Boolean =
+        transaction(DBManager.db) {
+            UserTable
+                .selectAll()
+                .where { (UserTable.id eq userId) and (UserTable.enabled eq true) }
+                .any()
+        }
+
+    fun ownerUserId(): Int? =
+        transaction(DBManager.db) {
+            UserTable
+                .innerJoin(RoleTable)
+                .selectAll()
+                .where { (RoleTable.name eq OWNER_ROLE) and (UserTable.enabled eq true) }
+                .firstOrNull()
+                ?.get(UserTable.id)
+                ?.value
+        }
+
     fun authenticate(username: String, password: String): Int? =
         transaction(DBManager.db) {
             val user =

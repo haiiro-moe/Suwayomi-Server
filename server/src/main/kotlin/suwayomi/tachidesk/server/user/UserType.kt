@@ -49,7 +49,11 @@ fun UserType.requireUserWithBasicFallback(ctx: Context): Int =
 
 fun getUserFromToken(token: String?): UserType {
     if (serverConfig.authMode.value != AuthMode.UI_LOGIN) {
-        return UserType.Admin(1)
+        return serverConfig.authUsername.value
+            .takeIf { it.isNotBlank() }
+            ?.let { UserService.findEnabledUserId(it) }
+            ?.let(UserType::Admin)
+            ?: UserType.Visitor
     }
 
     if (token.isNullOrBlank()) {
@@ -68,7 +72,7 @@ fun getUserFromContext(ctx: Context): UserType {
     return when (serverConfig.authMode.value) {
         // NOTE: Basic Auth is expected to have been validated by JavalinSetup
         AuthMode.NONE, AuthMode.BASIC_AUTH -> {
-            UserType.Admin(1)
+            getUserFromToken(null)
         }
 
         AuthMode.SIMPLE_LOGIN -> {
@@ -95,7 +99,7 @@ fun getUserFromWsContext(ctx: WsConnectContext): UserType {
     return when (serverConfig.authMode.value) {
         // NOTE: Basic Auth is expected to have been validated by JavalinSetup
         AuthMode.NONE, AuthMode.BASIC_AUTH -> {
-            UserType.Admin(1)
+            getUserFromToken(null)
         }
 
         AuthMode.SIMPLE_LOGIN -> {

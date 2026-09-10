@@ -8,6 +8,7 @@ import com.auth0.jwt.algorithms.Algorithm
 import com.auth0.jwt.exceptions.JWTVerificationException
 import io.github.oshai.kotlinlogging.KotlinLogging
 import suwayomi.tachidesk.server.serverConfig
+import suwayomi.tachidesk.server.user.UserService
 import suwayomi.tachidesk.server.user.UserType
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
@@ -83,6 +84,7 @@ object Jwt {
             "Token intended for different audience ${jwt.audience}"
         }
         val userId = jwt.getClaim("user_id").asInt() ?: error("Token has no user id")
+        require(UserService.isEnabled(userId)) { "User is disabled or no longer exists" }
         return createAccessToken(userId)
     }
 
@@ -98,6 +100,9 @@ object Jwt {
             }
 
             val userId = decodedJWT.getClaim("user_id").asInt() ?: return UserType.Visitor
+            if (!UserService.isEnabled(userId)) {
+                return UserType.Visitor
+            }
             return UserType.Admin(userId)
         } catch (e: JWTVerificationException) {
             logger.warn(e) { "Received invalid token" }
