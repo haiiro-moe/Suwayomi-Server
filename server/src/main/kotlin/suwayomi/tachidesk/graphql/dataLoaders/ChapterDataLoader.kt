@@ -11,7 +11,6 @@ import com.expediagroup.graphql.dataloader.KotlinDataLoader
 import graphql.GraphQLContext
 import org.dataloader.DataLoader
 import org.dataloader.DataLoaderFactory
-import org.jetbrains.exposed.v1.core.Case
 import org.jetbrains.exposed.v1.core.Slf4jSqlDebugLogger
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
@@ -20,8 +19,6 @@ import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.greater
 import org.jetbrains.exposed.v1.core.greaterEq
 import org.jetbrains.exposed.v1.core.inList
-import org.jetbrains.exposed.v1.core.intLiteral
-import org.jetbrains.exposed.v1.core.sum
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
@@ -107,58 +104,24 @@ class ChapterFlagCountForMangaDataLoader : KotlinDataLoader<Int, MangaChapterSta
     override fun getDataLoader(graphQLContext: GraphQLContext): DataLoader<Int, MangaChapterStats> =
         DataLoaderFactory.newDataLoader { ids ->
             future {
+                val userId = graphQLContext.getAttribute(Attribute.TachideskUser).requireUser()
                 transaction {
                     addLogger(Slf4jSqlDebugLogger)
-
-                    val unreadCount =
-                        Case()
-                            .When(ChapterTable.isRead eq false, intLiteral(1))
-                            .Else(intLiteral(0))
-                            .sum()
-
-                    val downloadCount =
-                        Case()
-                            .When(ChapterTable.isDownloaded eq true, intLiteral(1))
-                            .Else(intLiteral(0))
-                            .sum()
-
-                    val bookmarkCount =
-                        Case()
-                            .When(ChapterTable.isBookmarked eq true, intLiteral(1))
-                            .Else(intLiteral(0))
-                            .sum()
-
-                    val statsByMangaId =
-                        ChapterTable
-                            .select(
-                                ChapterTable.manga,
-                                unreadCount,
-                                downloadCount,
-                                bookmarkCount,
-                            ).where {
-                                ChapterTable.manga inList ids
-                            }.groupBy(ChapterTable.manga)
-                            .associate {
-                                val mangaId = it[ChapterTable.manga].value
-
-                                mangaId to
-                                    MangaChapterStats(
-                                        unreadCount = it[unreadCount] ?: 0,
-                                        downloadCount = it[downloadCount] ?: 0,
-                                        bookmarkCount = it[bookmarkCount] ?: 0,
-                                    )
-                            }
-
-                    ids.map {
-                        statsByMangaId[it] ?: MangaChapterStats(
-                            unreadCount = 0,
-                            downloadCount = 0,
-                            bookmarkCount = 0,
+                    val rows = ChapterTable.selectAll().where { ChapterTable.manga inList ids }.toList()
+                    val states = UserChapterStateService.getForUser(userId, rows.map { it[ChapterTable.id].value })
+                    val statsByMangaId = rows.groupBy { it[ChapterTable.manga].value }.mapValues { (_, chapters) ->
+                        MangaChapterStats(
+                            unreadCount = chapters.count { !states[it[ChapterTable.id].value]?.isRead.orFalse() },
+                            downloadCount = chapters.count { it[ChapterTable.isDownloaded] },
+                            bookmarkCount = chapters.count { states[it[ChapterTable.id].value]?.isBookmarked.orFalse() },
                         )
                     }
+                    ids.map { statsByMangaId[it] ?: MangaChapterStats(0, 0, 0) }
                 }
             }
         }
+
+    private fun Boolean?.orFalse(): Boolean = this == true
 }
 
 class HasDuplicateChaptersForMangaDataLoader : KotlinDataLoader<Int, Boolean> {
