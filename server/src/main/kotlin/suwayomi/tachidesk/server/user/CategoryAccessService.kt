@@ -4,9 +4,12 @@ import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.or
+import org.jetbrains.exposed.v1.jdbc.deleteWhere
+import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.update
 import suwayomi.tachidesk.manga.model.table.CategoryMangaTable
 import suwayomi.tachidesk.manga.model.table.CategoryTable
 import suwayomi.tachidesk.manga.model.table.MangaTable
@@ -16,6 +19,37 @@ import suwayomi.tachidesk.server.user.model.UserCategoryAccessTable
 import suwayomi.tachidesk.server.user.model.UserTable
 
 object CategoryAccessService {
+    fun setAccess(userId: Int, categoryId: Int, read: Boolean, edit: Boolean) {
+        transaction(DBManager.db) {
+            val normalizedRead = read || edit
+            val existing = UserCategoryAccessTable
+                .selectAll()
+                .where {
+                    (UserCategoryAccessTable.user eq userId) and
+                        (UserCategoryAccessTable.category eq categoryId)
+                }
+                .firstOrNull()
+            if (!normalizedRead && !edit) {
+                UserCategoryAccessTable.deleteWhere {
+                    (UserCategoryAccessTable.user eq userId) and
+                        (UserCategoryAccessTable.category eq categoryId)
+                }
+            } else if (existing == null) {
+                UserCategoryAccessTable.insert {
+                    it[user] = userId
+                    it[category] = categoryId
+                    it[canRead] = normalizedRead
+                    it[canEdit] = edit
+                }
+            } else {
+                UserCategoryAccessTable.update({ UserCategoryAccessTable.id eq existing[UserCategoryAccessTable.id] }) {
+                    it[canRead] = normalizedRead
+                    it[canEdit] = edit
+                }
+            }
+        }
+    }
+
     fun accessFor(userId: Int, categoryId: Int): CategoryAccess =
         transaction(DBManager.db) {
             if (isOwner(userId)) return@transaction CategoryAccess(read = true, edit = true)

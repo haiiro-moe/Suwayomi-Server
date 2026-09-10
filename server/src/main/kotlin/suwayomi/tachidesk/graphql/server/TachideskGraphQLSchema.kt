@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 import suwayomi.tachidesk.graphql.directives.RequireAuthDirectiveWiring
 import suwayomi.tachidesk.graphql.directives.RequirePermissionDirectiveWiring
 import suwayomi.tachidesk.graphql.mutations.BackupMutation
+import suwayomi.tachidesk.graphql.mutations.CategoryAccessMutation
 import suwayomi.tachidesk.graphql.mutations.CategoryMutation
 import suwayomi.tachidesk.graphql.mutations.ChapterMutation
 import suwayomi.tachidesk.graphql.mutations.DownloadMutation
@@ -128,6 +129,7 @@ object GraphQLSchemaProvider {
                 mutations =
                     listOf(
                         TopLevelObject(BackupMutation()),
+                        TopLevelObject(CategoryAccessMutation()),
                         TopLevelObject(UserAdminMutation()),
                         TopLevelObject(CategoryMutation()),
                         TopLevelObject(ChapterMutation()),
