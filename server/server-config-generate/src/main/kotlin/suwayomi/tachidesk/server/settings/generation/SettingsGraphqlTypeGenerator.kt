@@ -106,9 +106,7 @@ object SettingsGraphqlTypeGenerator {
     ) {
         groupedSettings.forEach { (group, settings) ->
             appendLine("// $group".addIndentation(indentation))
-            if (asType && !isInterface && !isOverride) {
-                appendLine("@suwayomi.tachidesk.graphql.directives.RequirePermission(\"${settingPermission(group)}\")".addIndentation(indentation))
-            }
+
             settings.forEach { setting -> writeSetting(setting, indentation, asType, isOverride, isNullable, isInterface) }
         }
     }

@@ -14,13 +14,11 @@ class RequirePermissionDirectiveWiring : KotlinSchemaDirectiveWiring {
     override fun onField(environment: KotlinFieldDirectiveEnvironment): GraphQLFieldDefinition {
         val originalDataFetcher = environment.getDataFetcher()
         val node =
-            environment.element
-                .getDirective("requirePermission")
-                ?.getArgument("node")
-                ?.getArgumentValue()
-                ?.value
-                ?.toString()
-                ?: error("Missing permission node")
+            environment.directive
+                .getArgument("node")
+                ?.getValue<String>()
+                ?.takeIf { it.isNotBlank() }
+                ?: error("Missing permission node on ${environment.element.name}")
 
         environment.setDataFetcher(
             DataFetcher { env ->
