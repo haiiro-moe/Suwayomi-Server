@@ -4,11 +4,14 @@ package suwayomi.tachidesk.graphql.mutations
 
 import graphql.schema.DataFetchingEnvironment
 import suwayomi.tachidesk.global.impl.util.Jwt
+import suwayomi.tachidesk.graphql.directives.RequireAuth
 import suwayomi.tachidesk.graphql.server.getAttribute
 import suwayomi.tachidesk.server.JavalinSetup.Attribute
 import suwayomi.tachidesk.server.serverConfig
+import suwayomi.tachidesk.server.user.UserProfileService
 import suwayomi.tachidesk.server.user.UserService
 import suwayomi.tachidesk.server.user.UserType
+import suwayomi.tachidesk.server.user.requireUser
 
 
 class UserMutation {
@@ -53,6 +56,42 @@ class UserMutation {
         val clientMutationId: String? = null,
         val refreshToken: String,
     )
+
+    data class UpdateProfileInput(
+        val clientMutationId: String? = null,
+        val description: String,
+    )
+
+    data class ProfileMutationPayload(
+        val clientMutationId: String?,
+        val updated: Boolean,
+    )
+
+    @RequireAuth
+    fun updateProfile(dataFetchingEnvironment: DataFetchingEnvironment, input: UpdateProfileInput): ProfileMutationPayload {
+        val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
+        UserProfileService.updateDescription(userId, input.description)
+        return ProfileMutationPayload(input.clientMutationId, true)
+    }
+
+    data class FavoriteMangaInput(
+        val clientMutationId: String? = null,
+        val mangaId: Int,
+    )
+
+    @RequireAuth
+    fun addFavorite(dataFetchingEnvironment: DataFetchingEnvironment, input: FavoriteMangaInput): ProfileMutationPayload {
+        val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
+        UserProfileService.addFavorite(userId, input.mangaId)
+        return ProfileMutationPayload(input.clientMutationId, true)
+    }
+
+    @RequireAuth
+    fun removeFavorite(dataFetchingEnvironment: DataFetchingEnvironment, input: FavoriteMangaInput): ProfileMutationPayload {
+        val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
+        UserProfileService.removeFavorite(userId, input.mangaId)
+        return ProfileMutationPayload(input.clientMutationId, true)
+    }
 
     data class RefreshTokenPayload(
         val clientMutationId: String?,

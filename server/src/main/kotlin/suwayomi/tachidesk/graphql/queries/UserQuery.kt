@@ -7,16 +7,34 @@ import suwayomi.tachidesk.graphql.directives.RequireAuth
 import suwayomi.tachidesk.graphql.directives.RequirePermission
 import suwayomi.tachidesk.server.database.DBManager
 import suwayomi.tachidesk.server.user.model.RoleTable
+import suwayomi.tachidesk.server.user.UserProfileService
+import suwayomi.tachidesk.server.user.UserType
 import suwayomi.tachidesk.server.user.model.UserTable
+import graphql.schema.DataFetchingEnvironment
+import suwayomi.tachidesk.graphql.server.getAttribute
+import suwayomi.tachidesk.server.JavalinSetup.Attribute
+import suwayomi.tachidesk.server.user.requireUser
+
 
 class UserQuery {
-	data class UserProfile(
-		val id: Int,
-		val username: String,
-		val displayName: String,
-		val avatarUrl: String?,
-		val role: String,
-	)
+    data class UserProfile(
+        val id: Int,
+        val username: String,
+        val displayName: String,
+        val avatarUrl: String?,
+        val role: String,
+        val description: String = "",
+        val favoriteMangaIds: List<Int> = emptyList(),
+    )
+
+    @RequireAuth
+    fun currentUserProfile(dataFetchingEnvironment: DataFetchingEnvironment): UserProfile? {
+        val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
+        return currentUser(userId)?.copy(
+            description = UserProfileService.description(userId),
+            favoriteMangaIds = UserProfileService.favoriteMangaIds(userId),
+        )
+    }
 
 	@RequireAuth
 	fun currentUser(userId: Int): UserProfile? =
