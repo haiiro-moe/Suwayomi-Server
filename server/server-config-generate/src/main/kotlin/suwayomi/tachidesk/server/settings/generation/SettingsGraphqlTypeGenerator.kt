@@ -124,7 +124,7 @@ object SettingsGraphqlTypeGenerator {
             return
         }
 
-        if (setting.requiresRestart) {
+        if (!setting.privacySafe || setting.requiresRestart) {
             appendLine("@GraphQLIgnore".addIndentation(indentation))
         }
 
