@@ -16,6 +16,8 @@ services:
             SUWAIRO_LOGO_PATH: ${SUWAIRO_LOGO_PATH:-/branding/logo.png}
             # Authentication is enabled by default; set SUWAIRO_AUTH_MODE=NONE only for local unauthenticated runs.
             SUWAIRO_AUTH_MODE: ${SUWAIRO_AUTH_MODE:-UI_LOGIN}
+            SUWAIRO_AUTH_USERNAME: ${SUWAIRO_AUTH_USERNAME:-}
+            SUWAIRO_AUTH_PASSWORD: ${SUWAIRO_AUTH_PASSWORD:-}
         healthcheck:
             test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:4567/ || exit 1"]
             interval: 10s

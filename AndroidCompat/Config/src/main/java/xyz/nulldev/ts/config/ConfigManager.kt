@@ -71,9 +71,19 @@ open class ConfigManager {
         // Load user config
         val userConfig = getUserConfig()
         val environmentConfig =
-            System.getenv("SUWAIRO_AUTH_MODE")?.trim()?.takeIf { it.isNotEmpty() }?.let {
-                ConfigFactory.parseString("server.authMode = ${it.uppercase()}")
-            } ?: ConfigFactory.empty()
+            ConfigFactory.parseMap(
+                buildMap {
+                    System.getenv("SUWAIRO_AUTH_MODE")?.trim()?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.authMode", it.uppercase())
+                    }
+                    System.getenv("SUWAIRO_AUTH_USERNAME")?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.authUsername", it)
+                    }
+                    System.getenv("SUWAIRO_AUTH_PASSWORD")?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.authPassword", it)
+                    }
+                },
+            )
 
         val config =
             ConfigFactory
