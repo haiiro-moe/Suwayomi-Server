@@ -91,6 +91,17 @@ object CategoryAccessService {
         }
     }
 
+    fun requireReadableManga(userId: Int, mangaIds: Collection<Int>) {
+        val visible = readableMangaIds(userId).toSet()
+        require(mangaIds.all { it in visible }) { "Manga is not visible to this user" }
+    }
+
+    fun requireEditableCategories(userId: Int, categoryIds: Collection<Int>) {
+        require(categoryIds.all { accessFor(userId, it).canEdit }) {
+            "Category is not editable by this user"
+        }
+    }
+
     private fun isOwner(userId: Int): Boolean =
         UserTable
             .innerJoin(RoleTable)

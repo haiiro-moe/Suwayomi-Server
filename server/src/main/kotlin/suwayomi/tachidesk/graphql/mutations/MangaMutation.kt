@@ -30,6 +30,10 @@ import suwayomi.tachidesk.manga.model.table.MangaMetaTable
 import suwayomi.tachidesk.manga.model.table.MangaTable
 import suwayomi.tachidesk.manga.model.table.toDataClass
 import suwayomi.tachidesk.server.JavalinSetup.future
+import suwayomi.tachidesk.graphql.server.getAttribute
+import suwayomi.tachidesk.server.JavalinSetup.Attribute
+import suwayomi.tachidesk.server.user.CategoryAccessService
+import suwayomi.tachidesk.server.user.requireUser
 import uy.kohesive.injekt.injectLazy
 import java.time.Instant
 import java.util.concurrent.CompletableFuture
@@ -104,8 +108,13 @@ class MangaMutation {
     }
 
     @RequireAuth
-    fun updateManga(input: UpdateMangaInput): CompletableFuture<UpdateMangaPayload?> {
+    fun updateManga(
+        dataFetchingEnvironment: graphql.schema.DataFetchingEnvironment,
+        input: UpdateMangaInput,
+    ): CompletableFuture<UpdateMangaPayload?> {
         val (clientMutationId, id, patch) = input
+        val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
+        CategoryAccessService.requireReadableManga(userId, listOf(id))
 
         return future {
             updateMangas(listOf(id), patch)
@@ -123,8 +132,13 @@ class MangaMutation {
     }
 
     @RequireAuth
-    fun updateMangas(input: UpdateMangasInput): CompletableFuture<UpdateMangasPayload?> {
+    fun updateMangas(
+        dataFetchingEnvironment: graphql.schema.DataFetchingEnvironment,
+        input: UpdateMangasInput,
+    ): CompletableFuture<UpdateMangasPayload?> {
         val (clientMutationId, ids, patch) = input
+        val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
+        CategoryAccessService.requireReadableManga(userId, ids)
 
         return future {
             updateMangas(ids, patch)
