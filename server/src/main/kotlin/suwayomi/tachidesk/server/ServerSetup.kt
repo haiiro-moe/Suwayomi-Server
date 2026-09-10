@@ -333,8 +333,9 @@ fun applicationSetup() {
         runMigrations(applicationDirs) {
             databaseUp()
         }
-        val ownerId = suwayomi.tachidesk.server.user.UserService.ensureBootstrapUser()
-        suwayomi.tachidesk.server.user.UserChapterStateService.migrateLegacyStateToOwner(ownerId)
+        suwayomi.tachidesk.server.user.UserService.ensureBootstrapUser()?.let { ownerId ->
+            suwayomi.tachidesk.server.user.UserChapterStateService.migrateLegacyStateToOwner(ownerId)
+        }
     }
 
     try {

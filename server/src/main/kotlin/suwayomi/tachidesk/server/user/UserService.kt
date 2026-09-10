@@ -25,7 +25,7 @@ private const val HASH_BYTES = 32
 private const val SALT_BYTES = 16
 
 object UserService {
-    fun ensureBootstrapUser(): Int {
+    fun ensureBootstrapUser(): Int? {
         return transaction(DBManager.db) {
             val ownerRole =
                 RoleTable
@@ -39,6 +39,10 @@ object UserService {
                     }
 
             val username = serverConfig.authUsername.value
+            val password = serverConfig.authPassword.value
+            if (username.isBlank() || password.isBlank()) {
+                return@transaction ownerUserIdInTransaction()
+            }
             val existingUser =
                 UserTable
                     .selectAll()
@@ -48,7 +52,7 @@ object UserService {
             if (existingUser == null) {
                 UserTable.insertAndGetId {
                     it[UserTable.username] = username
-                    it[passwordHash] = hashPassword(serverConfig.authPassword.value)
+                    it[passwordHash] = hashPassword(password)
                     it[displayName] = username
                     it[role] = ownerRole
                 }.value
@@ -57,6 +61,38 @@ object UserService {
             }
         }
     }
+
+    fun isOnboardingRequired(): Boolean =
+        transaction(DBManager.db) {
+            ownerUserIdInTransaction() == null &&
+                (serverConfig.authUsername.value.isBlank() || serverConfig.authPassword.value.isBlank())
+        }
+
+    fun setupOwner(username: String, password: String): Int {
+        require(username.isNotBlank()) { "Username is required" }
+        require(password.length >= 8) { "Password must be at least 8 characters" }
+        return transaction(DBManager.db) {
+            if (!isOnboardingRequiredInTransaction()) {
+                throw IllegalStateException("Owner setup is no longer available")
+            }
+            val ownerRole = RoleTable.selectAll().where { RoleTable.name eq OWNER_ROLE }.first()[RoleTable.id]
+            UserTable.insertAndGetId {
+                it[UserTable.username] = username
+                it[passwordHash] = hashPassword(password)
+                it[displayName] = username
+                it[role] = ownerRole
+            }.value
+        }
+    }
+
+    private fun ownerUserIdInTransaction(): Int? =
+        UserTable.innerJoin(RoleTable).selectAll()
+            .where { (RoleTable.name eq OWNER_ROLE) and (UserTable.enabled eq true) }
+            .firstOrNull()?.get(UserTable.id)?.value
+
+    private fun isOnboardingRequiredInTransaction(): Boolean =
+        ownerUserIdInTransaction() == null &&
+            (serverConfig.authUsername.value.isBlank() || serverConfig.authPassword.value.isBlank())
 
     fun findEnabledUserId(username: String): Int? =
         transaction(DBManager.db) {

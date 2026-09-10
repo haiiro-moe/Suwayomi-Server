@@ -20,6 +20,8 @@ import suwayomi.tachidesk.server.user.requireUser
 
 
 class UserQuery {
+    fun onboardingStatus(): Boolean = UserService.isOnboardingRequired()
+
     data class UserProfile(
         val id: Int,
         val username: String,

@@ -28,6 +28,27 @@ class UserMutation {
         val refreshToken: String,
     )
 
+    data class SetupOwnerInput(
+        val clientMutationId: String? = null,
+        val username: String,
+        val password: String,
+    )
+
+    data class SetupOwnerPayload(
+        val clientMutationId: String?,
+        val accessToken: String,
+        val refreshToken: String,
+    )
+
+    fun setupOwner(dataFetchingEnvironment: DataFetchingEnvironment, input: SetupOwnerInput): SetupOwnerPayload {
+        if (dataFetchingEnvironment.getAttribute(Attribute.TachideskUser) !is UserType.Visitor) {
+            throw IllegalArgumentException("Cannot setup while already logged-in")
+        }
+        val userId = UserService.setupOwner(input.username, input.password)
+        val jwt = Jwt.generateJwt(userId)
+        return SetupOwnerPayload(input.clientMutationId, jwt.accessToken, jwt.refreshToken)
+    }
+
     fun login(
         dataFetchingEnvironment: DataFetchingEnvironment,
         input: LoginInput,
