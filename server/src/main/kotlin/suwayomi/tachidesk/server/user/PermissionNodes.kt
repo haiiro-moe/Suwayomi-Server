@@ -34,6 +34,7 @@ object PermissionNodes {
     const val SETTINGS_KOREADER_SYNC = "settings.koreader_sync"
     const val SETTINGS_WEB_VIEW = "settings.web_view"
     const val SETTINGS_SYNCYOMI = "settings.syncyomi"
+    const val SETTINGS_TRACKING = "settings.tracking"
 
     val catalog: Set<String> = setOf(
         LIBRARY_READ,
@@ -68,6 +69,7 @@ object PermissionNodes {
         SETTINGS_KOREADER_SYNC,
         SETTINGS_WEB_VIEW,
         SETTINGS_SYNCYOMI,
+        SETTINGS_TRACKING,
     )
 
     fun forGroup(group: String): String = "settings.${group.lowercase().replace(' ', '_').replace('/', '_')}"
