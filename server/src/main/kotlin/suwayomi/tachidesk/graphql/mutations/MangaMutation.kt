@@ -18,6 +18,8 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
 import suwayomi.tachidesk.graphql.directives.RequireAuth
+import suwayomi.tachidesk.graphql.directives.RequirePermission
+import suwayomi.tachidesk.server.user.PermissionNodes
 import suwayomi.tachidesk.graphql.types.ChapterType
 import suwayomi.tachidesk.graphql.types.MangaMetaType
 import suwayomi.tachidesk.graphql.types.MangaType
@@ -107,7 +109,7 @@ class MangaMutation {
         }
     }
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.BROWSE_ADD_TO_LIBRARY)
     fun updateManga(
         dataFetchingEnvironment: graphql.schema.DataFetchingEnvironment,
         input: UpdateMangaInput,
@@ -131,7 +133,7 @@ class MangaMutation {
         }
     }
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.BROWSE_ADD_TO_LIBRARY)
     fun updateMangas(
         dataFetchingEnvironment: graphql.schema.DataFetchingEnvironment,
         input: UpdateMangasInput,
@@ -165,7 +167,7 @@ class MangaMutation {
         val manga: MangaType,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.BROWSE_READ)
     @GraphQLDeprecated("Deprecated in Tachiyomix 1.6", ReplaceWith("fetchMangaAndChapters"))
     fun fetchManga(input: FetchMangaInput): CompletableFuture<FetchMangaPayload?> {
         val (clientMutationId, id) = input
@@ -197,7 +199,7 @@ class MangaMutation {
         val chapters: List<ChapterType>,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.BROWSE_READ)
     fun fetchMangaAndChapters(input: FetchMangaAndChaptersInput): CompletableFuture<DataFetcherResult<FetchMangaAndChaptersPayload?>> {
         val (clientMutationId, id, fetchManga, fetchChapters) = input
 
