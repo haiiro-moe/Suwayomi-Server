@@ -4,6 +4,13 @@ object PermissionNodes {
     const val LIBRARY_READ = "library.read"
     const val LIBRARY_CATEGORY_READ = "library.category.read"
     const val LIBRARY_CATEGORY_EDIT = "library.category.edit"
+    const val LIBRARY_CATEGORY_CREATE = "library.category.create"
+    const val LIBRARY_CATEGORY_DELETE = "library.category.delete"
+    const val BROWSE_READ = "browse.read"
+    const val BROWSE_EXTENSIONS_INSTALL = "browse.extensions.install"
+    const val BROWSE_EXTENSIONS_UPDATE = "browse.extensions.update"
+    const val BROWSE_ADD_TO_LIBRARY = "browse.add_to_library"
+    const val MIGRATE_ACCESS = "migrate.access"
     const val UPDATES_READ = "updates.read"
     const val UPDATES_TRIGGER = "updates.trigger"
     const val UPDATES_MANAGE_CRON = "updates.manage_cron"
@@ -32,6 +39,13 @@ object PermissionNodes {
         LIBRARY_READ,
         LIBRARY_CATEGORY_READ,
         LIBRARY_CATEGORY_EDIT,
+        LIBRARY_CATEGORY_CREATE,
+        LIBRARY_CATEGORY_DELETE,
+        BROWSE_READ,
+        BROWSE_EXTENSIONS_INSTALL,
+        BROWSE_EXTENSIONS_UPDATE,
+        BROWSE_ADD_TO_LIBRARY,
+        MIGRATE_ACCESS,
         UPDATES_READ,
         UPDATES_TRIGGER,
         UPDATES_MANAGE_CRON,

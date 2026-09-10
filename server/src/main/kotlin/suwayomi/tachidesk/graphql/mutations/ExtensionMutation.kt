@@ -10,6 +10,8 @@ import org.jetbrains.exposed.v1.core.neq
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import suwayomi.tachidesk.graphql.directives.RequireAuth
+import suwayomi.tachidesk.graphql.directives.RequirePermission
+import suwayomi.tachidesk.server.user.PermissionNodes
 import suwayomi.tachidesk.graphql.types.ExtensionStoreType
 import suwayomi.tachidesk.graphql.types.ExtensionType
 import suwayomi.tachidesk.manga.impl.extension.Extension
@@ -79,7 +81,7 @@ class ExtensionMutation {
         }
     }
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.BROWSE_EXTENSIONS_UPDATE)
     fun updateExtension(input: UpdateExtensionInput): CompletableFuture<UpdateExtensionPayload?> {
         val (clientMutationId, id, patch) = input
 
@@ -102,7 +104,7 @@ class ExtensionMutation {
         }
     }
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.BROWSE_EXTENSIONS_UPDATE)
     fun updateExtensions(input: UpdateExtensionsInput): CompletableFuture<UpdateExtensionsPayload?> {
         val (clientMutationId, ids, patch) = input
 
@@ -174,7 +176,7 @@ class ExtensionMutation {
         val extension: ExtensionType,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.BROWSE_EXTENSIONS_INSTALL)
     fun installExternalExtension(input: InstallExternalExtensionInput): CompletableFuture<InstallExternalExtensionPayload?> {
         val (clientMutationId, extensionFile) = input
 
