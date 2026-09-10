@@ -2,6 +2,7 @@ package suwayomi.tachidesk.graphql.mutations
 
 import suwayomi.tachidesk.graphql.directives.RequirePermission
 import suwayomi.tachidesk.server.user.CategoryAccessService
+import suwayomi.tachidesk.server.user.PermissionNodes
 
 data class SetCategoryAccessInput(
     val clientMutationId: String? = null,
@@ -17,7 +18,7 @@ data class SetCategoryAccessPayload(
 )
 
 class CategoryAccessMutation {
-    @RequirePermission("users.manage")
+    @RequirePermission(PermissionNodes.ADMIN_USERS_MANAGE)
     fun setCategoryAccess(input: SetCategoryAccessInput): SetCategoryAccessPayload {
         CategoryAccessService.setAccess(input.userId, input.categoryId, input.canRead, input.canEdit)
         return SetCategoryAccessPayload(input.clientMutationId, true)

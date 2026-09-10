@@ -5,6 +5,7 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import suwayomi.tachidesk.graphql.directives.RequireAuth
 import suwayomi.tachidesk.graphql.directives.RequirePermission
+import suwayomi.tachidesk.server.user.PermissionNodes
 import suwayomi.tachidesk.server.database.DBManager
 import suwayomi.tachidesk.server.user.model.RoleTable
 import suwayomi.tachidesk.server.user.UserMessageService
@@ -102,7 +103,7 @@ class UserQuery {
 				}
 		}
 
-	@RequirePermission("users.manage")
+	@RequirePermission(PermissionNodes.ADMIN_USERS_MANAGE)
 	fun users(): List<UserProfile> =
 		transaction(DBManager.db) {
 			UserTable

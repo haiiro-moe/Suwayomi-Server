@@ -13,5 +13,6 @@ class PermissionNodesTest {
         assertTrue(nodes.contains(PermissionNodes.SETTINGS_BACKUP))
         assertTrue(nodes.contains(PermissionNodes.ADMIN_USERS_MANAGE))
         assertTrue(nodes.contains(PermissionNodes.ADMIN_ROLES_MANAGE))
+        assertTrue(nodes.none { it == "users.manage" || it == "roles.manage" })
     }
 }

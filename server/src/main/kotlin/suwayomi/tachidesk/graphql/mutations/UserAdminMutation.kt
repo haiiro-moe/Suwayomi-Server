@@ -4,6 +4,7 @@ import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.update
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import suwayomi.tachidesk.graphql.directives.RequirePermission
+import suwayomi.tachidesk.server.user.PermissionNodes
 import suwayomi.tachidesk.server.database.DBManager
 import suwayomi.tachidesk.server.user.UserService
 import suwayomi.tachidesk.server.user.model.UserTable
@@ -22,7 +23,7 @@ class UserAdminMutation {
 		val updated: Boolean,
 	)
 
-	@RequirePermission("users.manage")
+	@RequirePermission(PermissionNodes.ADMIN_USERS_MANAGE)
 	fun updateUser(input: UpdateUserInput): UpdateUserPayload {
 		transaction(DBManager.db) {
 			UserTable.update({ UserTable.id eq input.id }) {
