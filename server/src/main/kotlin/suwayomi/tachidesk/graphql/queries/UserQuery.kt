@@ -64,9 +64,9 @@ class UserQuery {
         }
 
     @RequireAuth
-    fun profile(dataFetchingEnvironment: DataFetchingEnvironment, userId: Int): UserProfile? {
+    fun profile(dataFetchingEnvironment: DataFetchingEnvironment, profileUserId: Int): UserProfile? {
         val viewerId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
-        return UserProfileService.publicProfile(viewerId, userId)?.let { publicProfile ->
+        return UserProfileService.publicProfile(viewerId, profileUserId)?.let { publicProfile ->
             UserProfile(
                 publicProfile.id,
                 publicProfile.username,
