@@ -63,6 +63,30 @@ object UserProfileService {
 
     fun favoriteMangaIds(userId: Int): List<Int> = favoriteMangaIdsForViewer(userId, userId)
 
+    data class FavoriteMangaEntry(
+        val mangaId: Int,
+        val accessible: Boolean,
+    )
+
+    /**
+     * All favorites of [profileUserId] from [viewerId]'s perspective. Every favorite is included, but manga the viewer
+     * cannot read only expose their ID - title, cover, and source stay hidden so the existence of the favorite does not
+     * leak metadata of restricted manga.
+     */
+    fun favoriteMangaEntriesForViewer(viewerId: Int, profileUserId: Int): List<FavoriteMangaEntry> =
+        transaction(DBManager.db) {
+            val favoriteIds =
+                UserFavoriteTable
+                    .select(UserFavoriteTable.manga)
+                    .where { UserFavoriteTable.user eq profileUserId }
+                    .map { it[UserFavoriteTable.manga].value }
+
+            if (favoriteIds.isEmpty()) return@transaction emptyList()
+
+            val visible = CategoryAccessService.readableMangaIds(viewerId).toSet()
+            favoriteIds.map { FavoriteMangaEntry(it, it in visible) }
+        }
+
     fun favoriteMangaIdsForViewer(viewerId: Int, profileUserId: Int): List<Int> = transaction(DBManager.db) {
         val visible = CategoryAccessService.readableMangaIds(viewerId)
         if (visible.isEmpty()) return@transaction emptyList()

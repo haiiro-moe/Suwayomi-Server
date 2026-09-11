@@ -1,12 +1,15 @@
 package suwayomi.tachidesk.graphql.queries
 
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import suwayomi.tachidesk.graphql.directives.RequireAuth
 import suwayomi.tachidesk.graphql.directives.RequirePermission
+import suwayomi.tachidesk.graphql.types.MangaType
 import suwayomi.tachidesk.server.user.PermissionNodes
 import suwayomi.tachidesk.server.database.DBManager
+import suwayomi.tachidesk.manga.model.table.MangaTable
 import suwayomi.tachidesk.server.user.model.RoleTable
 import suwayomi.tachidesk.server.user.UserMessageService
 import suwayomi.tachidesk.server.user.UserProfileService
@@ -30,7 +33,14 @@ class UserQuery {
         val role: String,
         val description: String = "",
         val favoriteMangaIds: List<Int> = emptyList(),
+        val favoriteManga: List<FavoriteMangaEntryType> = emptyList(),
         val permissions: List<String> = emptyList(),
+    )
+
+    data class FavoriteMangaEntryType(
+        val mangaId: Int,
+        val manga: MangaType?,
+        val accessible: Boolean,
     )
 
     data class MessageType(
@@ -67,6 +77,17 @@ class UserQuery {
     fun profile(dataFetchingEnvironment: DataFetchingEnvironment, profileUserId: Int): UserProfile? {
         val viewerId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
         return UserProfileService.publicProfile(viewerId, profileUserId)?.let { publicProfile ->
+            val entries = UserProfileService.favoriteMangaEntriesForViewer(viewerId, profileUserId)
+            val mangaById =
+                transaction {
+                    val accessibleIds = entries.filter { it.accessible }.map { it.mangaId }
+                    if (accessibleIds.isEmpty()) {
+                        emptyMap()
+                    } else {
+                        MangaTable.selectAll().where { MangaTable.id inList accessibleIds }
+                            .associate { it[MangaTable.id].value to MangaType(it) }
+                    }
+                }
             UserProfile(
                 publicProfile.id,
                 publicProfile.username,
@@ -75,6 +96,7 @@ class UserQuery {
                 "public",
                 publicProfile.description,
                 publicProfile.favoriteMangaIds,
+                entries.map { FavoriteMangaEntryType(it.mangaId, mangaById[it.mangaId], it.accessible) },
             )
         }
     }
