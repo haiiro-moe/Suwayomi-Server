@@ -13,6 +13,7 @@ import suwayomi.tachidesk.manga.model.table.MangaTable
 import suwayomi.tachidesk.server.user.model.RoleTable
 import suwayomi.tachidesk.server.user.UserMessageService
 import suwayomi.tachidesk.server.user.UserProfileService
+import suwayomi.tachidesk.server.user.UserSettingService
 import suwayomi.tachidesk.server.user.UserService
 import suwayomi.tachidesk.server.user.UserType
 import suwayomi.tachidesk.server.user.model.UserTable
@@ -33,6 +34,9 @@ class UserQuery {
         val role: String,
         val description: String = "",
         val bannerUrl: String? = null,
+        val appTheme: String? = null,
+        val themeMode: String? = null,
+        val pureBlackMode: Boolean? = null,
         val favoriteMangaIds: List<Int> = emptyList(),
         val favoriteManga: List<FavoriteMangaEntryType> = emptyList(),
         val permissions: List<String> = emptyList(),
@@ -78,6 +82,7 @@ class UserQuery {
     fun profile(dataFetchingEnvironment: DataFetchingEnvironment, profileUserId: Int): UserProfile? {
         val viewerId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
         return UserProfileService.publicProfile(viewerId, profileUserId)?.let { publicProfile ->
+            val profileSettings = UserSettingService.read(profileUserId)
             val entries = UserProfileService.favoriteMangaEntriesForViewer(viewerId, profileUserId)
             val mangaById =
                 transaction {
@@ -97,6 +102,9 @@ class UserQuery {
                 "public",
                 publicProfile.description,
                 publicProfile.bannerUrl,
+                profileSettings["appTheme"],
+                profileSettings["themeMode"],
+                profileSettings["shouldUsePureBlackMode"]?.let { it == "true" },
                 publicProfile.favoriteMangaIds,
                 entries.map { FavoriteMangaEntryType(it.mangaId, mangaById[it.mangaId], it.accessible) },
             )
