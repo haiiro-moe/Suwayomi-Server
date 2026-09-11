@@ -7,6 +7,7 @@ import suwayomi.tachidesk.manga.model.table.MangaTable
 object UserProfileTable : IntIdTable("user_profiles") {
     val user = reference("user_id", UserTable, onDelete = ReferenceOption.CASCADE).uniqueIndex()
     val description = varchar("description", 2000).default("")
+    val bannerUrl = varchar("banner_url", 2048).nullable()
 }
 
 object UserFavoriteTable : IntIdTable("user_favorites") {

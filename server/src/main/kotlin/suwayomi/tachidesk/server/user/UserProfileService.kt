@@ -21,10 +21,22 @@ object UserProfileService {
             ?.get(UserProfileTable.description) ?: ""
     }
 
-    fun updateProfile(userId: Int, displayName: String?, avatarUrl: String?, description: String) {
+    fun bannerUrl(userId: Int): String? = transaction(DBManager.db) {
+        UserProfileTable.selectAll().where { UserProfileTable.user eq userId }.firstOrNull()
+            ?.get(UserProfileTable.bannerUrl)
+    }
+
+    fun updateProfile(
+        userId: Int,
+        displayName: String?,
+        avatarUrl: String?,
+        bannerUrl: String?,
+        description: String,
+    ) {
         require(description.length <= 2000) { "Profile description is too long" }
         displayName?.let { require(it.isNotBlank() && it.length <= 128) { "Display name is invalid" } }
         avatarUrl?.let { require(it.length <= 2048) { "Avatar URL is too long" } }
+        bannerUrl?.let { require(it.length <= 2048) { "Banner URL is too long" } }
         transaction(DBManager.db) {
             if (displayName != null) {
                 UserTable.update({ UserTable.id eq userId }) {
@@ -39,6 +51,9 @@ object UserProfileService {
             UserProfileTable.upsert(UserProfileTable.user) {
                 it[user] = userId
                 it[UserProfileTable.description] = description
+                if (bannerUrl != null) {
+                    it[UserProfileTable.bannerUrl] = bannerUrl.ifBlank { null }
+                }
             }
         }
     }
@@ -108,6 +123,7 @@ object UserProfileService {
                     displayName = row[UserTable.displayName],
                     avatarUrl = row[UserTable.avatarUrl],
                     description = description(profileUserId),
+                    bannerUrl = bannerUrl(profileUserId),
                     favoriteMangaIds = favoriteMangaIdsForViewer(viewerId, profileUserId),
                 )
             }
@@ -119,6 +135,7 @@ object UserProfileService {
         val displayName: String,
         val avatarUrl: String?,
         val description: String,
+        val bannerUrl: String?,
         val favoriteMangaIds: List<Int>,
     )
 
@@ -134,6 +151,7 @@ object UserProfileService {
                     displayName = row[UserTable.displayName],
                     avatarUrl = row[UserTable.avatarUrl],
                     description = description(row[UserTable.id].value),
+                    bannerUrl = bannerUrl(row[UserTable.id].value),
                     favoriteMangaIds = emptyList(),
                 )
             }

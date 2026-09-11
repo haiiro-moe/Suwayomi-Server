@@ -32,6 +32,7 @@ class UserQuery {
         val avatarUrl: String?,
         val role: String,
         val description: String = "",
+        val bannerUrl: String? = null,
         val favoriteMangaIds: List<Int> = emptyList(),
         val favoriteManga: List<FavoriteMangaEntryType> = emptyList(),
         val permissions: List<String> = emptyList(),
@@ -95,6 +96,7 @@ class UserQuery {
                 publicProfile.avatarUrl,
                 "public",
                 publicProfile.description,
+                publicProfile.bannerUrl,
                 publicProfile.favoriteMangaIds,
                 entries.map { FavoriteMangaEntryType(it.mangaId, mangaById[it.mangaId], it.accessible) },
             )
@@ -106,6 +108,7 @@ class UserQuery {
         val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
         return currentUser(userId)?.copy(
             description = UserProfileService.description(userId),
+            bannerUrl = UserProfileService.bannerUrl(userId),
             favoriteMangaIds = UserProfileService.favoriteMangaIds(userId),
             permissions = UserService.permissionsFor(userId).sorted(),
         )
