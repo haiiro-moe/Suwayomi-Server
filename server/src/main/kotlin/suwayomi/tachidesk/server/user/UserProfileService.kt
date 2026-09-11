@@ -3,6 +3,7 @@ package suwayomi.tachidesk.server.user
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.core.neq
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
@@ -12,6 +13,7 @@ import org.jetbrains.exposed.v1.jdbc.upsert
 import suwayomi.tachidesk.manga.model.table.MangaTable
 import suwayomi.tachidesk.server.database.DBManager
 import suwayomi.tachidesk.server.user.model.UserFavoriteTable
+import suwayomi.tachidesk.server.user.model.UserMangaNoteTable
 import suwayomi.tachidesk.server.user.model.UserProfileTable
 import suwayomi.tachidesk.server.user.model.UserTable
 
@@ -74,6 +76,62 @@ object UserProfileService {
                 (UserFavoriteTable.user eq userId) and (UserFavoriteTable.manga eq mangaId)
             }
         }
+    }
+
+    fun mangaNote(userId: Int, mangaId: Int): String = transaction(DBManager.db) {
+        UserMangaNoteTable
+            .selectAll()
+            .where { (UserMangaNoteTable.user eq userId) and (UserMangaNoteTable.manga eq mangaId) }
+            .firstOrNull()
+            ?.get(UserMangaNoteTable.note)
+            ?: ""
+    }
+
+    fun setMangaNote(userId: Int, mangaId: Int, note: String) {
+        require(note.length <= 10000) { "Note is too long" }
+        CategoryAccessService.requireReadableManga(userId, listOf(mangaId))
+        transaction(DBManager.db) {
+            if (note.isBlank()) {
+                UserMangaNoteTable.deleteWhere {
+                    (UserMangaNoteTable.user eq userId) and (UserMangaNoteTable.manga eq mangaId)
+                }
+            } else {
+                UserMangaNoteTable.upsert(UserMangaNoteTable.user, UserMangaNoteTable.manga) {
+                    it[user] = userId
+                    it[manga] = mangaId
+                    it[UserMangaNoteTable.note] = note
+                }
+            }
+        }
+    }
+
+    data class UserMangaNote(
+        val userId: Int,
+        val username: String,
+        val displayName: String,
+        val note: String,
+    )
+
+    /** Other users' notes for a manga. The viewer's own note is excluded - it is rendered by the editable section. */
+    fun otherUserMangaNotes(viewerId: Int, mangaId: Int): List<UserMangaNote> = transaction(DBManager.db) {
+        val visible = CategoryAccessService.readableMangaIds(viewerId)
+        if (mangaId !in visible) {
+            return@transaction emptyList()
+        }
+
+        UserMangaNoteTable
+            .innerJoin(UserTable)
+            .selectAll()
+            .where { (UserMangaNoteTable.manga eq mangaId) and (UserMangaNoteTable.user neq viewerId) }
+            .orderBy(UserTable.username)
+            .map {
+                UserMangaNote(
+                    userId = it[UserMangaNoteTable.user].value,
+                    username = it[UserTable.username],
+                    displayName = it[UserTable.displayName],
+                    note = it[UserMangaNoteTable.note],
+                )
+            }
     }
 
     fun favoriteMangaIds(userId: Int): List<Int> = favoriteMangaIdsForViewer(userId, userId)

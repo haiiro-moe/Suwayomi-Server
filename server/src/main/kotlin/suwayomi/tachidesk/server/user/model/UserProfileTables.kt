@@ -18,3 +18,13 @@ object UserFavoriteTable : IntIdTable("user_favorites") {
         uniqueIndex(user, manga)
     }
 }
+
+object UserMangaNoteTable : IntIdTable("user_manga_notes") {
+    val user = reference("user_id", UserTable, onDelete = ReferenceOption.CASCADE)
+    val manga = reference("manga_id", MangaTable, onDelete = ReferenceOption.CASCADE)
+    val note = text("note")
+
+    init {
+        uniqueIndex(user, manga)
+    }
+}

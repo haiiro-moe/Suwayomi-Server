@@ -118,6 +118,19 @@ class UserMutation {
         return ProfileMutationPayload(input.clientMutationId, true)
     }
 
+    data class SetMangaNoteInput(
+        val clientMutationId: String? = null,
+        val mangaId: Int,
+        val note: String,
+    )
+
+    @RequireAuth
+    fun setMangaNote(dataFetchingEnvironment: DataFetchingEnvironment, input: SetMangaNoteInput): ProfileMutationPayload {
+        val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
+        UserProfileService.setMangaNote(userId, input.mangaId, input.note)
+        return ProfileMutationPayload(input.clientMutationId, true)
+    }
+
     data class SendMessageInput(
         val clientMutationId: String? = null,
         val receiverId: Int,

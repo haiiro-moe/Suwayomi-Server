@@ -73,6 +73,27 @@ class UserQuery {
     }
 
     @RequireAuth
+    fun myMangaNote(dataFetchingEnvironment: DataFetchingEnvironment, mangaId: Int): String {
+        val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
+        return UserProfileService.mangaNote(userId, mangaId)
+    }
+
+    @RequireAuth
+    fun otherUserMangaNotes(dataFetchingEnvironment: DataFetchingEnvironment, mangaId: Int): List<UserMangaNoteType> {
+        val viewerId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
+        return UserProfileService.otherUserMangaNotes(viewerId, mangaId).map {
+            UserMangaNoteType(it.userId, it.username, it.displayName, it.note)
+        }
+    }
+
+    data class UserMangaNoteType(
+        val userId: Int,
+        val username: String,
+        val displayName: String,
+        val note: String,
+    )
+
+    @RequireAuth
     fun userDirectory(): List<UserProfile> =
         UserProfileService.directory().map { profile ->
             UserProfile(profile.id, profile.username, profile.displayName, profile.avatarUrl, "public", profile.description)
