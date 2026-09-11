@@ -107,7 +107,9 @@ object SettingsGraphqlTypeGenerator {
         groupedSettings.forEach { (group, settings) ->
             appendLine("// $group".addIndentation(indentation))
 
-            settings.forEach { setting -> writeSetting(setting, indentation, asType, isOverride, isNullable, isInterface) }
+            settings
+                .filterNot { it.name == "globalUpdateInterval" }
+                .forEach { setting -> writeSetting(setting, indentation, asType, isOverride, isNullable, isInterface) }
         }
     }
 

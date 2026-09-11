@@ -140,7 +140,7 @@ class Updater : IUpdater {
             }
 
             logger.info {
-                "Trigger global update (interval= ${serverConfig.globalUpdateInterval.value}h, lastAutomatedUpdate= ${Date(
+                "Trigger global update (cron= ${serverConfig.globalUpdateCron.value}, lastAutomatedUpdate= ${Date(
                     lastAutomatedUpdate,
                 )})"
             }

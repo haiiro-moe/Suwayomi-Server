@@ -57,7 +57,7 @@ object SettingsBackupServerSettingsGenerator {
         sortedSettings: List<SettingsRegistry.SettingMetadata>,
         indentation: Int,
     ) {
-        sortedSettings.forEach { setting ->
+        sortedSettings.filterNot { it.name == "globalUpdateInterval" }.forEach { setting ->
             val deprecated = setting.deprecated
 
             if (deprecated != null) {
