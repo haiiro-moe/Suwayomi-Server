@@ -19,6 +19,27 @@ import suwayomi.tachidesk.server.user.model.UserCategoryAccessTable
 import suwayomi.tachidesk.server.user.model.UserTable
 
 object CategoryAccessService {
+    data class UserCategoryAccess(
+        val userId: Int,
+        val categoryId: Int,
+        val canRead: Boolean,
+        val canEdit: Boolean,
+    )
+
+    fun accessForUser(userId: Int): List<UserCategoryAccess> = transaction(DBManager.db) {
+        UserCategoryAccessTable
+            .selectAll()
+            .where { UserCategoryAccessTable.user eq userId }
+            .map {
+                UserCategoryAccess(
+                    userId = it[UserCategoryAccessTable.user].value,
+                    categoryId = it[UserCategoryAccessTable.category].value,
+                    canRead = it[UserCategoryAccessTable.canRead],
+                    canEdit = it[UserCategoryAccessTable.canEdit],
+                )
+            }
+    }
+
     fun setAccess(userId: Int, categoryId: Int, read: Boolean, edit: Boolean) {
         transaction(DBManager.db) {
             val normalizedRead = read || edit
@@ -79,17 +100,36 @@ object CategoryAccessService {
             }
         }
 
-    fun readableMangaIds(userId: Int): List<Int> {
-        val categoryIds = readableCategoryIds(userId)
-        if (categoryIds.isEmpty()) return emptyList()
-        return transaction(DBManager.db) {
-            CategoryMangaTable
-                .select(CategoryMangaTable.manga)
-                .where { CategoryMangaTable.category inList categoryIds }
-                .withDistinct()
-                .map { it[CategoryMangaTable.manga].value }
+    fun readableMangaIds(userId: Int): List<Int> =
+        transaction(DBManager.db) {
+            if (isOwner(userId)) {
+                return@transaction MangaTable.select(MangaTable.id).map { it[MangaTable.id].value }
+            }
+
+            val readableCategories = readableCategoryIds(userId).toSet()
+            val categorizedMangaIds =
+                CategoryMangaTable
+                    .select(CategoryMangaTable.manga)
+                    .withDistinct()
+                    .map { it[CategoryMangaTable.manga].value }
+                    .toSet()
+            val readableCategorizedMangaIds =
+                CategoryMangaTable
+                    .select(CategoryMangaTable.manga)
+                    .where { CategoryMangaTable.category inList readableCategories }
+                    .withDistinct()
+                    .map { it[CategoryMangaTable.manga].value }
+                    .toSet()
+
+            MangaTable
+                .select(MangaTable.id, MangaTable.inLibrary)
+                .map { row ->
+                    val mangaId = row[MangaTable.id].value
+                    val inLibrary = row[MangaTable.inLibrary]
+                    mangaId to (!inLibrary || mangaId !in categorizedMangaIds || mangaId in readableCategorizedMangaIds)
+                }.filter { it.second }
+                .map { it.first }
         }
-    }
 
     fun requireReadableManga(userId: Int, mangaIds: Collection<Int>) {
         val visible = readableMangaIds(userId).toSet()

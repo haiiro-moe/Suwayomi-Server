@@ -151,6 +151,7 @@ object UserService {
                 return@transaction PermissionNodes.catalog
             }
             RolePermissionTable
+                .innerJoin(RoleTable)
                 .innerJoin(UserTable)
                 .innerJoin(PermissionTable)
                 .selectAll()
@@ -173,6 +174,7 @@ object UserService {
             }
 
             RolePermissionTable
+                .innerJoin(RoleTable)
                 .innerJoin(UserTable)
                 .innerJoin(PermissionTable)
                 .selectAll()

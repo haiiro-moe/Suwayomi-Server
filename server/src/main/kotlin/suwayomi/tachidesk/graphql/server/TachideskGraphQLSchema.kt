@@ -23,6 +23,7 @@ import suwayomi.tachidesk.graphql.directives.RequireAuthDirectiveWiring
 import suwayomi.tachidesk.graphql.directives.RequirePermissionDirectiveWiring
 import suwayomi.tachidesk.graphql.mutations.BackupMutation
 import suwayomi.tachidesk.graphql.mutations.CategoryAccessMutation
+import suwayomi.tachidesk.graphql.mutations.CategoryAccessQuery
 import suwayomi.tachidesk.graphql.mutations.CategoryMutation
 import suwayomi.tachidesk.graphql.mutations.ChapterMutation
 import suwayomi.tachidesk.graphql.mutations.DownloadMutation
@@ -115,6 +116,7 @@ object GraphQLSchemaProvider {
                     listOf(
                         TopLevelObject(BackupQuery()),
                         TopLevelObject(CategoryQuery()),
+                        TopLevelObject(CategoryAccessQuery()),
                         TopLevelObject(ChapterQuery()),
                         TopLevelObject(DownloadQuery()),
                         TopLevelObject(ExtensionQuery()),
