@@ -4,11 +4,11 @@ import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
-import org.jetbrains.exposed.v1.jdbc.insertIgnore
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
+import org.jetbrains.exposed.v1.jdbc.upsert
 import suwayomi.tachidesk.manga.model.table.MangaTable
 import suwayomi.tachidesk.server.database.DBManager
 import suwayomi.tachidesk.server.user.model.UserFavoriteTable
@@ -21,19 +21,24 @@ object UserProfileService {
             ?.get(UserProfileTable.description) ?: ""
     }
 
-    fun updateDescription(userId: Int, description: String) {
+    fun updateProfile(userId: Int, displayName: String?, avatarUrl: String?, description: String) {
         require(description.length <= 2000) { "Profile description is too long" }
+        displayName?.let { require(it.isNotBlank() && it.length <= 128) { "Display name is invalid" } }
+        avatarUrl?.let { require(it.length <= 2048) { "Avatar URL is too long" } }
         transaction(DBManager.db) {
-            val existing = UserProfileTable.selectAll().where { UserProfileTable.user eq userId }.firstOrNull()
-            if (existing == null) {
-                UserProfileTable.insertIgnore {
-                    it[user] = userId
-                    it[UserProfileTable.description] = description
+            if (displayName != null) {
+                UserTable.update({ UserTable.id eq userId }) {
+                    it[UserTable.displayName] = displayName
                 }
-            } else {
-                UserProfileTable.update({ UserProfileTable.user eq userId }) {
-                    it[UserProfileTable.description] = description
+            }
+            if (avatarUrl != null) {
+                UserTable.update({ UserTable.id eq userId }) {
+                    it[UserTable.avatarUrl] = avatarUrl.ifBlank { null }
                 }
+            }
+            UserProfileTable.upsert(UserProfileTable.user) {
+                it[user] = userId
+                it[UserProfileTable.description] = description
             }
         }
     }
@@ -41,7 +46,7 @@ object UserProfileService {
     fun addFavorite(userId: Int, mangaId: Int) {
         CategoryAccessService.requireReadableManga(userId, listOf(mangaId))
         transaction(DBManager.db) {
-            UserFavoriteTable.insertIgnore {
+            UserFavoriteTable.upsert(UserFavoriteTable.user, UserFavoriteTable.manga) {
                 it[user] = userId
                 it[manga] = mangaId
             }

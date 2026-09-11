@@ -81,6 +81,8 @@ class UserMutation {
 
     data class UpdateProfileInput(
         val clientMutationId: String? = null,
+        val displayName: String? = null,
+        val avatarUrl: String? = null,
         val description: String,
     )
 
@@ -92,7 +94,7 @@ class UserMutation {
     @RequireAuth
     fun updateProfile(dataFetchingEnvironment: DataFetchingEnvironment, input: UpdateProfileInput): ProfileMutationPayload {
         val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
-        UserProfileService.updateDescription(userId, input.description)
+        UserProfileService.updateProfile(userId, input.displayName, input.avatarUrl, input.description)
         return ProfileMutationPayload(input.clientMutationId, true)
     }
 
