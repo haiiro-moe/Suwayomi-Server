@@ -5,6 +5,7 @@ package suwayomi.tachidesk.graphql.mutations
 import com.expediagroup.graphql.generator.annotations.GraphQLDeprecated
 import com.expediagroup.graphql.server.extensions.toGraphQLError
 import graphql.execution.DataFetcherResult
+import graphql.schema.DataFetchingEnvironment
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jetbrains.exposed.v1.core.LikePattern
 import org.jetbrains.exposed.v1.core.Op
@@ -167,10 +168,15 @@ class MangaMutation {
         val manga: MangaType,
     )
 
-    @RequirePermission(PermissionNodes.BROWSE_READ)
+    @RequirePermission(PermissionNodes.UPDATES_TRIGGER)
     @GraphQLDeprecated("Deprecated in Tachiyomix 1.6", ReplaceWith("fetchMangaAndChapters"))
-    fun fetchManga(input: FetchMangaInput): CompletableFuture<FetchMangaPayload?> {
+    fun fetchManga(
+        dataFetchingEnvironment: DataFetchingEnvironment,
+        input: FetchMangaInput,
+    ): CompletableFuture<FetchMangaPayload?> {
         val (clientMutationId, id) = input
+        val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
+        CategoryAccessService.requireReadableManga(userId, listOf(id))
 
         return future {
             Manga.updateMangaAndChapters(id, updateChapters = false)
@@ -199,9 +205,14 @@ class MangaMutation {
         val chapters: List<ChapterType>,
     )
 
-    @RequirePermission(PermissionNodes.BROWSE_READ)
-    fun fetchMangaAndChapters(input: FetchMangaAndChaptersInput): CompletableFuture<DataFetcherResult<FetchMangaAndChaptersPayload?>> {
+    @RequirePermission(PermissionNodes.UPDATES_TRIGGER)
+    fun fetchMangaAndChapters(
+        dataFetchingEnvironment: DataFetchingEnvironment,
+        input: FetchMangaAndChaptersInput,
+    ): CompletableFuture<DataFetcherResult<FetchMangaAndChaptersPayload?>> {
         val (clientMutationId, id, fetchManga, fetchChapters) = input
+        val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
+        CategoryAccessService.requireReadableManga(userId, listOf(id))
 
         return future {
             val error =
