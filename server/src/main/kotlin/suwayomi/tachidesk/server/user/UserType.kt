@@ -31,6 +31,12 @@ fun UserType.requirePermission(node: String): Int {
     return userId
 }
 
+fun UserType.requireOwner(): Int {
+    val userId = requireUser()
+    if (!UserService.isOwner(userId)) throw ForbiddenException()
+    return userId
+}
+
 fun UserType.requireUserWithBasicFallback(ctx: Context): Int =
     when (this) {
         is UserType.Admin -> {

@@ -16,6 +16,8 @@ data class Backup(
     // suwayomi
     @ProtoNumber(9000) var meta: Map<String, String> = emptyMap(),
     @ProtoNumber(9001) var serverSettings: BackupServerSettings? = null,
+    /** Optional Suwairo multi-user snapshot; absent in legacy backups. */
+    @ProtoNumber(9002) var userData: BackupUserData? = null,
 ) {
     fun getSourceMap(): Map<Long, String> =
         backupSources

@@ -182,6 +182,13 @@ object UserService {
                 }.count() > 0
         }
 
+    fun isOwner(userId: Int): Boolean =
+        transaction(DBManager.db) {
+            UserTable.innerJoin(RoleTable).selectAll()
+                .where { (UserTable.id eq userId) and (RoleTable.name eq OWNER_ROLE) }
+                .any()
+        }
+
     fun hashPasswordForAdmin(password: String): String = hashPassword(password)
 
     private fun hashPassword(password: String): String {

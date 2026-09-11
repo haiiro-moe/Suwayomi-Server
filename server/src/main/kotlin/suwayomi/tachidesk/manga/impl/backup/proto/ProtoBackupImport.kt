@@ -33,6 +33,7 @@ import suwayomi.tachidesk.manga.impl.backup.proto.handlers.BackupGlobalMetaHandl
 import suwayomi.tachidesk.manga.impl.backup.proto.handlers.BackupMangaHandler
 import suwayomi.tachidesk.manga.impl.backup.proto.handlers.BackupSettingsHandler
 import suwayomi.tachidesk.manga.impl.backup.proto.handlers.BackupSourceHandler
+import suwayomi.tachidesk.manga.impl.backup.proto.handlers.BackupUserDataHandler
 import suwayomi.tachidesk.manga.impl.backup.proto.models.Backup
 import suwayomi.tachidesk.manga.model.table.CategoryTable
 import suwayomi.tachidesk.manga.model.table.ChapterTable
@@ -195,6 +196,8 @@ object ProtoBackupImport : ProtoBackupBase() {
         val restoreSettings = if (flags.includeServerSettings) 1 else 0
         val getRestoreAmount = { size: Int -> size + restoreCategories + restoreMeta + restoreSettings }
         val restoreAmount = getRestoreAmount(if (flags.includeManga) backup.backupManga.size else 0)
+
+        BackupUserDataHandler.restore(backup.userData)
 
         if (flags.includeServerSettings) {
             updateRestoreState(

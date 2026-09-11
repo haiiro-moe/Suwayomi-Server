@@ -9,7 +9,7 @@ import suwayomi.tachidesk.manga.impl.backup.proto.models.Backup
 import suwayomi.tachidesk.server.JavalinSetup.Attribute
 import suwayomi.tachidesk.server.JavalinSetup.future
 import suwayomi.tachidesk.server.JavalinSetup.getAttribute
-import suwayomi.tachidesk.server.user.requirePermission
+import suwayomi.tachidesk.server.user.requireOwner
 import suwayomi.tachidesk.server.user.requireUser
 import suwayomi.tachidesk.server.user.PermissionNodes
 import suwayomi.tachidesk.server.util.handler
@@ -33,7 +33,7 @@ object BackupController {
                 }
             },
             behaviorOf = { ctx ->
-                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.SETTINGS_BACKUP)
+                ctx.getAttribute(Attribute.TachideskUser).requireOwner()
                 ctx.future {
                     future {
                         ProtoBackupImport.restoreLegacy(ctx.bodyInputStream())
@@ -61,7 +61,7 @@ object BackupController {
                 }
             },
             behaviorOf = { ctx ->
-                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.SETTINGS_BACKUP)
+                ctx.getAttribute(Attribute.TachideskUser).requireOwner()
                 // TODO: rewrite this with ctx.uploadedFiles(), don't call the multipart field "backup.proto.gz"
                 ctx.future {
                     future {
@@ -87,7 +87,7 @@ object BackupController {
                 }
             },
             behaviorOf = { ctx ->
-                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.SETTINGS_BACKUP)
+                ctx.getAttribute(Attribute.TachideskUser).requireOwner()
                 ctx.contentType("application/octet-stream")
                 ctx.future {
                     future {
@@ -110,7 +110,7 @@ object BackupController {
                 }
             },
             behaviorOf = { ctx ->
-                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.SETTINGS_BACKUP)
+                ctx.getAttribute(Attribute.TachideskUser).requireOwner()
                 ctx.contentType("application/octet-stream")
 
                 ctx.header("Content-Disposition", """attachment; filename="${Backup.getFilename()}"""")
@@ -135,7 +135,7 @@ object BackupController {
                 }
             },
             behaviorOf = { ctx ->
-                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.SETTINGS_BACKUP)
+                ctx.getAttribute(Attribute.TachideskUser).requireOwner()
                 ctx.future {
                     future {
                         ProtoBackupValidator.validate(ctx.bodyInputStream())
@@ -167,7 +167,7 @@ object BackupController {
                 }
             },
             behaviorOf = { ctx ->
-                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.SETTINGS_BACKUP)
+                ctx.getAttribute(Attribute.TachideskUser).requireOwner()
                 ctx.future {
                     future {
                         ProtoBackupValidator.validate(ctx.uploadedFile("backup.proto.gz")!!.content())
