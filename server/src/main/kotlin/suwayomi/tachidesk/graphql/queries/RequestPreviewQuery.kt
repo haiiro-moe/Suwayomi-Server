@@ -60,6 +60,8 @@ class RequestPreviewQuery {
         if (needsFetch) {
             runBlocking {
                 Manga.updateMangaAndChapters(mangaId, updateManga = true, updateChapters = true)
+                // make sure the cover is cached before the client tries to load it
+                runCatching { Manga.getMangaThumbnail(mangaId) }
             }
         }
 
