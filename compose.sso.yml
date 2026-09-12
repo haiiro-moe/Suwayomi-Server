@@ -1,0 +1,47 @@
+name: suwairo
+
+# SSO-ready compose variant.
+#
+# Copy this file over compose.yml (or run `docker compose -f compose.sso.yml up -d`) to start Suwairo with
+# OIDC single sign-on enabled. Adjust the example values below to match your provider first.
+#
+# The redirect URI to register on your OIDC provider is:  <server-address>/sso/callback
+# (e.g. https://server.suwairo.orb.local/sso/callback)
+
+services:
+    server:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        restart: unless-stopped
+        ports:
+            - "${SUWAIRO_PORT:-4567}:4567"
+        volumes:
+            - suwairo-data:/data
+            - ${SUWAIRO_BRANDING_DIR:-./branding}:/branding:ro
+        environment:
+            TZ: ${TZ:-Etc/UTC}
+            SUWAIRO_LOGO_PATH: ${SUWAIRO_LOGO_PATH:-/branding/logo.png}
+            # Enable OIDC single sign-on. Existing local accounts keep password login.
+            SUWAIRO_AUTH_MODE: SSO
+            # Example values - replace with your OIDC provider's details.
+            SUWAIRO_SSO_ISSUER_URL: https://auth.example.com
+            SUWAIRO_SSO_CLIENT_ID: suwairo
+            # replace with the actual client secret before starting
+            SUWAIRO_SSO_CLIENT_SECRET: "change-me-client-secret"
+            # Role assigned to users logging in via SSO for the first time. Must exist in Suwairo.
+            SUWAIRO_SSO_DEFAULT_ROLE: sso
+            # OIDC scopes to request. "openid profile email" covers username, display name, and email.
+            SUWAIRO_SSO_SCOPE: openid profile email
+            # Local password login remains available for existing accounts (owner bootstrap).
+            SUWAIRO_AUTH_USERNAME: ${SUWAIRO_AUTH_USERNAME:-}
+            SUWAIRO_AUTH_PASSWORD: ${SUWAIRO_AUTH_PASSWORD:-}
+        healthcheck:
+            test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:4567/ || exit 1"]
+            interval: 10s
+            timeout: 5s
+            retries: 30
+            start_period: 30s
+
+volumes:
+    suwairo-data:

@@ -82,6 +82,21 @@ open class ConfigManager {
                     System.getenv("SUWAIRO_AUTH_PASSWORD")?.takeIf { it.isNotEmpty() }?.let {
                         put("server.authPassword", it)
                     }
+                    System.getenv("SUWAIRO_SSO_ISSUER_URL")?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.ssoIssuerUrl", it)
+                    }
+                    System.getenv("SUWAIRO_SSO_CLIENT_ID")?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.ssoClientId", it)
+                    }
+                    System.getenv("SUWAIRO_SSO_CLIENT_SECRET")?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.ssoClientSecret", it)
+                    }
+                    System.getenv("SUWAIRO_SSO_DEFAULT_ROLE")?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.ssoDefaultRole", it)
+                    }
+                    System.getenv("SUWAIRO_SSO_SCOPE")?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.ssoScope", it)
+                    }
                 },
             )
 
