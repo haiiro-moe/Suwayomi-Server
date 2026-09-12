@@ -54,7 +54,7 @@ fun UserType.requireUserWithBasicFallback(ctx: Context): Int =
     }
 
 fun getUserFromToken(token: String?): UserType {
-    if (serverConfig.authMode.value != AuthMode.UI_LOGIN) {
+    if (serverConfig.authMode.value != AuthMode.UI_LOGIN && serverConfig.authMode.value != AuthMode.SSO) {
         return UserService.ownerUserId()?.let(UserType::Admin) ?: UserType.Visitor
     }
 
@@ -83,7 +83,7 @@ fun getUserFromContext(ctx: Context): UserType {
             if (cookieValid() && userId != null) UserType.Admin(userId) else UserType.Visitor
         }
 
-        AuthMode.UI_LOGIN -> {
+        AuthMode.UI_LOGIN, AuthMode.SSO -> {
             val authentication = ctx.header(Header.AUTHORIZATION) ?: ctx.cookie("suwayomi-server-token")
             val token = authentication?.substringAfter("Bearer ") ?: ctx.queryParam("token")
 
@@ -110,7 +110,7 @@ fun getUserFromWsContext(ctx: WsConnectContext): UserType {
             if (cookieValid() && userId != null) UserType.Admin(userId) else UserType.Visitor
         }
 
-        AuthMode.UI_LOGIN -> {
+        AuthMode.UI_LOGIN, AuthMode.SSO -> {
             val authentication =
                 ctx.header(Header.AUTHORIZATION) ?: ctx.header("Sec-WebSocket-Protocol") ?: ctx.cookie("suwayomi-server-token")
             val token = authentication?.substringAfter("Bearer ") ?: ctx.queryParam("token")

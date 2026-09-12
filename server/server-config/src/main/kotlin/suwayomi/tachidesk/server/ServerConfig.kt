@@ -652,6 +652,46 @@ class ServerConfig(
         excludeFromBackup = true,
     )
 
+    val ssoIssuerUrl: MutableStateFlow<String> by StringSetting(
+        protoNumber = 98,
+        group = SettingGroup.AUTH,
+        privacySafe = true,
+        defaultValue = "",
+        excludeFromBackup = true,
+    )
+
+    val ssoClientId: MutableStateFlow<String> by StringSetting(
+        protoNumber = 99,
+        group = SettingGroup.AUTH,
+        privacySafe = true,
+        defaultValue = "",
+        excludeFromBackup = true,
+    )
+
+    val ssoClientSecret: MutableStateFlow<String> by StringSetting(
+        protoNumber = 101,
+        group = SettingGroup.AUTH,
+        privacySafe = false,
+        defaultValue = "",
+        excludeFromBackup = true,
+    )
+
+    val ssoDefaultRole: MutableStateFlow<String> by StringSetting(
+        protoNumber = 102,
+        group = SettingGroup.AUTH,
+        privacySafe = true,
+        defaultValue = "",
+        excludeFromBackup = true,
+    )
+
+    val ssoScope: MutableStateFlow<String> by StringSetting(
+        protoNumber = 103,
+        group = SettingGroup.AUTH,
+        privacySafe = true,
+        defaultValue = "openid profile email",
+        excludeFromBackup = true,
+    )
+
     fun createDownloadConversionsMap(protoNumber: Int, key: String) = MapSetting<String, DownloadConversion>(
         protoNumber = protoNumber,
         group = SettingGroup.DOWNLOADER,
