@@ -44,6 +44,7 @@ import suwayomi.tachidesk.graphql.mutations.UserAdminMutation
 import suwayomi.tachidesk.graphql.mutations.UserMutation
 import suwayomi.tachidesk.graphql.mutations.UserRoleAdminMutation
 import suwayomi.tachidesk.graphql.mutations.UserSettingsMutation
+import suwayomi.tachidesk.graphql.queries.RequestPreviewQuery
 import suwayomi.tachidesk.graphql.queries.RequestQuery
 import suwayomi.tachidesk.graphql.queries.RoleQuery
 import suwayomi.tachidesk.graphql.queries.UserQuery
@@ -134,6 +135,7 @@ object GraphQLSchemaProvider {
                         TopLevelObject(UpdateQuery()),
                         TopLevelObject(RoleQuery()),
                         TopLevelObject(RequestQuery()),
+                        TopLevelObject(RequestPreviewQuery()),
                         TopLevelObject(UserQuery()),
                         TopLevelObject(UserSettingsQuery()),
                     ),
