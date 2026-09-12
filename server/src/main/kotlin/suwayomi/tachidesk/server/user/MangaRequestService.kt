@@ -3,19 +3,15 @@ package suwayomi.tachidesk.server.user
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
-import org.jetbrains.exposed.v1.core.neq
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
 import org.jetbrains.exposed.v1.jdbc.upsert
-import suwayomi.tachidesk.manga.impl.Category
-import suwayomi.tachidesk.manga.impl.CategoryManga
 import suwayomi.tachidesk.manga.impl.Library
 import suwayomi.tachidesk.manga.impl.Manga
 import suwayomi.tachidesk.manga.impl.download.DownloadManager
-import suwayomi.tachidesk.manga.model.table.CategoryTable
 import suwayomi.tachidesk.manga.model.table.ChapterTable
 import suwayomi.tachidesk.manga.model.table.MangaTable
 import suwayomi.tachidesk.server.database.DBManager
@@ -124,23 +120,11 @@ object MangaRequestService {
             Manga.updateMangaAndChapters(mangaId, updateManga = true, updateChapters = true)
         }
 
-        // add to the default category (mirrors Library.addMangaToLibrary behavior for un-categorized adds)
+        // add to the library; categories are assigned afterwards via updateMangaCategories (category select dialog)
         transaction(DBManager.db) {
-            val defaultCategories =
-                CategoryTable
-                    .selectAll()
-                    .where {
-                        (CategoryTable.isDefault eq true) and
-                            (CategoryTable.id neq Category.DEFAULT_CATEGORY_ID)
-                    }.map { it[CategoryTable.id].value }
-
             MangaTable.update({ MangaTable.id eq mangaId }) {
                 it[MangaTable.inLibrary] = true
                 it[MangaTable.inLibraryAt] = Instant.now().epochSecond
-            }
-
-            defaultCategories.forEach { categoryId ->
-                CategoryManga.addMangaToCategory(mangaId, categoryId)
             }
         }.apply {
             Library.handleMangaThumbnail(mangaId, true)
