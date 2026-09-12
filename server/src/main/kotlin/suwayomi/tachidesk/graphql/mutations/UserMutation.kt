@@ -5,9 +5,11 @@ package suwayomi.tachidesk.graphql.mutations
 import graphql.schema.DataFetchingEnvironment
 import suwayomi.tachidesk.global.impl.util.Jwt
 import suwayomi.tachidesk.graphql.directives.RequireAuth
+import suwayomi.tachidesk.graphql.directives.RequirePermission
 import suwayomi.tachidesk.graphql.server.getAttribute
 import suwayomi.tachidesk.server.JavalinSetup.Attribute
 import suwayomi.tachidesk.server.serverConfig
+import suwayomi.tachidesk.server.user.PermissionNodes
 import suwayomi.tachidesk.server.user.UserMessageService
 import suwayomi.tachidesk.server.user.UserProfileService
 import suwayomi.tachidesk.server.user.UserService
@@ -124,7 +126,7 @@ class UserMutation {
         val note: String,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.MANGA_NOTES_WRITE)
     fun setMangaNote(dataFetchingEnvironment: DataFetchingEnvironment, input: SetMangaNoteInput): ProfileMutationPayload {
         val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
         UserProfileService.setMangaNote(userId, input.mangaId, input.note)

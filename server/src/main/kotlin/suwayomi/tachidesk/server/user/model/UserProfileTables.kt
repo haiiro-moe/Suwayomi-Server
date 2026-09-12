@@ -28,3 +28,14 @@ object UserMangaNoteTable : IntIdTable("user_manga_notes") {
         uniqueIndex(user, manga)
     }
 }
+
+object MangaRequestTable : IntIdTable("manga_requests") {
+    val user = reference("user_id", UserTable, onDelete = ReferenceOption.CASCADE)
+    val manga = reference("manga_id", MangaTable, onDelete = ReferenceOption.CASCADE)
+    val createdAt = long("created_at")
+    val status = varchar("status", 32).default("PENDING")
+
+    init {
+        uniqueIndex(user, manga)
+    }
+}

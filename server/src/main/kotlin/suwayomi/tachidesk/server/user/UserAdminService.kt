@@ -115,6 +115,9 @@ object UserAdminService {
         require(normalizedName.isNotEmpty()) { "Role name must not be empty" }
         require(normalizedName != "owner") { "The owner role name is reserved" }
         require(permissions.all { it in PermissionNodes.catalog }) { "Unknown permission node" }
+        require(
+            PermissionNodes.BROWSE_ADD_TO_LIBRARY !in permissions || PermissionNodes.BROWSE_REQUEST !in permissions,
+        ) { "\"browse.add_to_library\" and \"browse.request\" cannot be granted together" }
     }
 
     private fun replacePermissions(roleId: Int, permissions: Set<String>) {

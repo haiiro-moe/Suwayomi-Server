@@ -10,6 +10,10 @@ object PermissionNodes {
     const val BROWSE_EXTENSIONS_INSTALL = "browse.extensions.install"
     const val BROWSE_EXTENSIONS_UPDATE = "browse.extensions.update"
     const val BROWSE_ADD_TO_LIBRARY = "browse.add_to_library"
+    const val BROWSE_REQUEST = "browse.request"
+    const val MANGA_NOTES_WRITE = "manga.notes.write"
+    const val REQUESTS_READ = "requests.read"
+    const val REQUESTS_MANAGE = "requests.manage"
     const val MIGRATE_ACCESS = "migrate.access"
     const val UPDATES_READ = "updates.read"
     const val UPDATES_TRIGGER = "updates.trigger"
@@ -46,6 +50,10 @@ object PermissionNodes {
         BROWSE_EXTENSIONS_INSTALL,
         BROWSE_EXTENSIONS_UPDATE,
         BROWSE_ADD_TO_LIBRARY,
+        BROWSE_REQUEST,
+        MANGA_NOTES_WRITE,
+        REQUESTS_READ,
+        REQUESTS_MANAGE,
         MIGRATE_ACCESS,
         UPDATES_READ,
         UPDATES_TRIGGER,

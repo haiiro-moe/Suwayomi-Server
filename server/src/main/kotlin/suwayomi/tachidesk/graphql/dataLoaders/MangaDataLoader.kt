@@ -28,6 +28,8 @@ import suwayomi.tachidesk.graphql.server.getAttribute
 import suwayomi.tachidesk.server.JavalinSetup.Attribute
 import suwayomi.tachidesk.server.JavalinSetup.future
 import suwayomi.tachidesk.server.user.CategoryAccessService
+import suwayomi.tachidesk.server.user.PermissionNodes
+import suwayomi.tachidesk.server.user.UserService
 import suwayomi.tachidesk.server.user.requireUser
 
 class MangaDataLoader : KotlinDataLoader<Int, MangaType> {
@@ -39,7 +41,14 @@ class MangaDataLoader : KotlinDataLoader<Int, MangaType> {
                 transaction {
                     addLogger(Slf4jSqlDebugLogger)
                     val userId = graphQLContext.getAttribute(Attribute.TachideskUser).requireUser()
-                    val visibleMangaIds = CategoryAccessService.readableMangaIds(userId).toSet()
+                    // request-only users may open any manga's page (request view) even though they cannot read it
+                    val openableMangaIds =
+                        if (UserService.hasPermission(userId, PermissionNodes.BROWSE_REQUEST)) {
+                            ids
+                        } else {
+                            CategoryAccessService.readableMangaIds(userId)
+                        }
+                    val visibleMangaIds = openableMangaIds.toSet()
                     val manga =
                         MangaTable
                             .selectAll()
