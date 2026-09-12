@@ -31,7 +31,9 @@ import suwayomi.tachidesk.server.JavalinSetup.Attribute
 import suwayomi.tachidesk.server.JavalinSetup.future
 import suwayomi.tachidesk.server.JavalinSetup.getAttribute
 import suwayomi.tachidesk.server.serverConfig
+import suwayomi.tachidesk.server.user.ForbiddenException
 import suwayomi.tachidesk.server.user.PermissionNodes
+import suwayomi.tachidesk.server.user.UserService
 import suwayomi.tachidesk.server.user.requirePermission
 import suwayomi.tachidesk.server.user.requireUser
 import suwayomi.tachidesk.server.user.requireUserWithBasicFallback
@@ -106,7 +108,14 @@ object MangaController {
                 }
             },
             behaviorOf = { ctx, mangaId ->
-                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_READ)
+                val user = ctx.getAttribute(Attribute.TachideskUser)
+                val userId = user.requireUser()
+                // users who may only request manga still need covers for the request preview
+                if (!UserService.hasPermission(userId, PermissionNodes.LIBRARY_READ) &&
+                    !UserService.hasPermission(userId, PermissionNodes.BROWSE_REQUEST)
+                ) {
+                    throw ForbiddenException()
+                }
                 ctx.future {
                     future { Manga.getMangaThumbnail(mangaId) }
                         .thenApply {
