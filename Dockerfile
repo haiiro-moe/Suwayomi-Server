@@ -10,7 +10,11 @@ COPY --from=node /usr/local/ /usr/local/
 RUN rm -f /usr/local/bin/pnpm /usr/local/bin/pnpx \
     && npm install --global pnpm@11.1.2
 
-ENV GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx3g -Dkotlin.daemon.jvm.options=-Xmx3g" \
+# Force UTF-8 for the build JVM: template engines (jte) read sources as UTF-8 and fail
+# with MalformedInputException if the environment leaks a non-UTF-8 default charset.
+ENV GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8 -Dkotlin.daemon.jvm.options=-Xmx3g" \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
     PNPM_STORE_DIR=/pnpm/store
 
 WORKDIR /workspace
