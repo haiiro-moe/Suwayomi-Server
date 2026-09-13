@@ -97,6 +97,9 @@ open class ConfigManager {
                     System.getenv("SUWAIRO_SSO_SCOPE")?.takeIf { it.isNotEmpty() }?.let {
                         put("server.ssoScope", it)
                     }
+                    System.getenv("SUWAIRO_SSO_PUBLIC_URL")?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.ssoPublicUrl", it)
+                    }
                 },
             )
 

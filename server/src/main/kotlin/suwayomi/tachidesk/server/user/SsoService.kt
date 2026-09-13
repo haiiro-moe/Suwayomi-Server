@@ -17,6 +17,7 @@ import suwayomi.tachidesk.server.database.DBManager
 import suwayomi.tachidesk.server.serverConfig
 import suwayomi.tachidesk.server.user.model.RoleTable
 import suwayomi.tachidesk.server.user.model.UserTable
+import suwayomi.tachidesk.server.util.ServerSubpath
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
@@ -48,6 +49,32 @@ object SsoService {
     fun clientId(): String = serverConfig.ssoClientId.value.trim()
 
     fun scope(): String = serverConfig.ssoScope.value.ifBlank { "openid profile email" }
+
+    fun publicUrl(): String = serverConfig.ssoPublicUrl.value.trim().trimEnd('/')
+
+    /**
+     * The redirect_uri used for the OIDC authorization code flow, sent both to the authorization
+     * endpoint and in the token exchange request. Per RFC 6749/OIDC Core, this must be an absolute
+     * URI that exactly matches what's registered with the identity provider (e.g. Tinyauth's
+     * TRUSTEDREDIRECTURIS) - a bare path is invalid and most spec-compliant providers reject it
+     * outright with something like "The provided redirect URI is not trusted".
+     *
+     * Falls back to a relative path if SUWAIRO_SSO_PUBLIC_URL isn't configured, but SSO will not
+     * actually work against a real OIDC provider without it set.
+     */
+    fun redirectUri(): String {
+        val callbackPath = ServerSubpath.maybeAddAsPrefix("/sso/callback")
+        val base = publicUrl()
+        if (base.isBlank()) {
+            logger.warn {
+                "SSO is configured but SUWAIRO_SSO_PUBLIC_URL is not set - the redirect_uri sent " +
+                    "to the identity provider will be a relative path, which most OIDC providers " +
+                    "(including Tinyauth) will reject as untrusted."
+            }
+            return callbackPath
+        }
+        return "$base$callbackPath"
+    }
 
     suspend fun discovery(): OidcDiscovery {
         val issuer = issuerUrl()

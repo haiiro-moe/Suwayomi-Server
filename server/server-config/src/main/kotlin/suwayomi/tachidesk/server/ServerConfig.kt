@@ -692,6 +692,14 @@ class ServerConfig(
         excludeFromBackup = true,
     )
 
+    val ssoPublicUrl: MutableStateFlow<String> by StringSetting(
+        protoNumber = 104,
+        group = SettingGroup.AUTH,
+        privacySafe = true,
+        defaultValue = "",
+        excludeFromBackup = true,
+    )
+
     fun createDownloadConversionsMap(protoNumber: Int, key: String) = MapSetting<String, DownloadConversion>(
         protoNumber = protoNumber,
         group = SettingGroup.DOWNLOADER,

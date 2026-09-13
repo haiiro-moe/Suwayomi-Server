@@ -208,7 +208,7 @@ object JavalinSetup {
             }
             ctx.sessionAttribute("sso-state", state)
 
-            val redirectUri = ServerSubpath.maybeAddAsPrefix("/sso/callback")
+            val redirectUri = SsoService.redirectUri()
             val authorizeUrl =
                 mapOf(
                     "response_type" to "code",
@@ -246,7 +246,7 @@ object JavalinSetup {
             }
             ctx.sessionAttribute("sso-state", null)
 
-            val ssoUser = kotlinx.coroutines.runBlocking { SsoService.exchangeCode(code, ServerSubpath.maybeAddAsPrefix("/sso/callback")) }
+            val ssoUser = kotlinx.coroutines.runBlocking { SsoService.exchangeCode(code, SsoService.redirectUri()) }
             val userId = SsoService.resolveUser(ssoUser)
             if (userId == null) {
                 ctx.header("Location", "$loginPath?ssoError=2")
