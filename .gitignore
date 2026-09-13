@@ -27,3 +27,5 @@ scripts/resources/*.so
 
 # deploy archives
 /dist
+
+.DS_Store
