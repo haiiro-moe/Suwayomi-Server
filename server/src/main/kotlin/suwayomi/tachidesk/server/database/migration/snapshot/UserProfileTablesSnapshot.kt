@@ -26,5 +26,7 @@ import suwayomi.tachidesk.server.user.model.UserTable
 object UserProfileTableV1 : IntIdTable("user_profiles") {
     val user = reference("user_id", UserTable, onDelete = ReferenceOption.CASCADE).uniqueIndex()
     val description = varchar("description", 2000).default("")
-    val bannerUrl = varchar("banner_url", 2048).nullable()
+    // banner_url intentionally omitted: it did not exist at M0068 and is added afterwards by
+    // M0071_UserProfileBanner. Adding it here would recreate the exact duplicate-column bug
+    // this snapshot exists to fix.
 }
