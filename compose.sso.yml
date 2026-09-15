@@ -9,6 +9,12 @@ name: suwairo
 # (e.g. https://server.suwairo.orb.local/sso/callback)
 
 services:
+    flaresolverr:
+        image: ghcr.io/thephaseless/byparr:latest
+        container_name: flaresolverr
+        environment:
+            TZ: ${TZ:-Etc/UTC}
+        restart: unless-stopped
     server:
         build:
             context: .
@@ -35,6 +41,8 @@ services:
             # Local password login remains available for existing accounts (owner bootstrap).
             SUWAIRO_AUTH_USERNAME: ${SUWAIRO_AUTH_USERNAME:-}
             SUWAIRO_AUTH_PASSWORD: ${SUWAIRO_AUTH_PASSWORD:-}
+            FLARESOLVERR_ENABLED: true
+            FLARESOLVERR_URL: http://flaresolverr:8191
         healthcheck:
             test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:4567/ || exit 1"]
             interval: 10s
