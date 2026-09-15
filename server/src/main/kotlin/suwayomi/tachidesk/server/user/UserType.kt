@@ -23,6 +23,20 @@ fun UserType.requireUser(): Int =
         UserType.Visitor -> throw UnauthorizedException()
     }
 
+fun UserType.requirePermission(node: String): Int {
+    val userId = requireUser()
+    if (!UserService.hasPermission(userId, node)) {
+        throw ForbiddenException()
+    }
+    return userId
+}
+
+fun UserType.requireOwner(): Int {
+    val userId = requireUser()
+    if (!UserService.isOwner(userId)) throw ForbiddenException()
+    return userId
+}
+
 fun UserType.requireUserWithBasicFallback(ctx: Context): Int =
     when (this) {
         is UserType.Admin -> {
@@ -40,8 +54,8 @@ fun UserType.requireUserWithBasicFallback(ctx: Context): Int =
     }
 
 fun getUserFromToken(token: String?): UserType {
-    if (serverConfig.authMode.value != AuthMode.UI_LOGIN) {
-        return UserType.Admin(1)
+    if (serverConfig.authMode.value != AuthMode.UI_LOGIN && serverConfig.authMode.value != AuthMode.SSO) {
+        return UserService.ownerUserId()?.let(UserType::Admin) ?: UserType.Visitor
     }
 
     if (token.isNullOrBlank()) {
@@ -60,14 +74,16 @@ fun getUserFromContext(ctx: Context): UserType {
     return when (serverConfig.authMode.value) {
         // NOTE: Basic Auth is expected to have been validated by JavalinSetup
         AuthMode.NONE, AuthMode.BASIC_AUTH -> {
-            UserType.Admin(1)
+            getUserFromToken(null)
         }
 
         AuthMode.SIMPLE_LOGIN -> {
-            if (cookieValid()) UserType.Admin(1) else UserType.Visitor
+            val username = ctx.sessionAttribute<String>("logged-in")
+            val userId = username?.let { UserService.findEnabledUserId(it) }
+            if (cookieValid() && userId != null) UserType.Admin(userId) else UserType.Visitor
         }
 
-        AuthMode.UI_LOGIN -> {
+        AuthMode.UI_LOGIN, AuthMode.SSO -> {
             val authentication = ctx.header(Header.AUTHORIZATION) ?: ctx.cookie("suwayomi-server-token")
             val token = authentication?.substringAfter("Bearer ") ?: ctx.queryParam("token")
 
@@ -85,14 +101,16 @@ fun getUserFromWsContext(ctx: WsConnectContext): UserType {
     return when (serverConfig.authMode.value) {
         // NOTE: Basic Auth is expected to have been validated by JavalinSetup
         AuthMode.NONE, AuthMode.BASIC_AUTH -> {
-            UserType.Admin(1)
+            getUserFromToken(null)
         }
 
         AuthMode.SIMPLE_LOGIN -> {
-            if (cookieValid()) UserType.Admin(1) else UserType.Visitor
+            val username = ctx.sessionAttribute<String>("logged-in")
+            val userId = username?.let { UserService.findEnabledUserId(it) }
+            if (cookieValid() && userId != null) UserType.Admin(userId) else UserType.Visitor
         }
 
-        AuthMode.UI_LOGIN -> {
+        AuthMode.UI_LOGIN, AuthMode.SSO -> {
             val authentication =
                 ctx.header(Header.AUTHORIZATION) ?: ctx.header("Sec-WebSocket-Protocol") ?: ctx.cookie("suwayomi-server-token")
             val token = authentication?.substringAfter("Bearer ") ?: ctx.queryParam("token")

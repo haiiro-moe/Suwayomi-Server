@@ -20,6 +20,8 @@ import org.jetbrains.exposed.v1.core.neq
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import suwayomi.tachidesk.graphql.directives.RequireAuth
+import suwayomi.tachidesk.graphql.directives.RequirePermission
+import suwayomi.tachidesk.server.user.PermissionNodes
 import suwayomi.tachidesk.graphql.queries.filter.BooleanFilter
 import suwayomi.tachidesk.graphql.queries.filter.ContentWarningFilter
 import suwayomi.tachidesk.graphql.queries.filter.Filter
@@ -190,7 +192,7 @@ class ExtensionQuery {
             )
     }
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.BROWSE_READ)
     fun extensions(
         condition: ExtensionCondition? = null,
         filter: ExtensionFilter? = null,

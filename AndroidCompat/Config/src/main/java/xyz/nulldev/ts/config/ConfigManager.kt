@@ -70,10 +70,43 @@ open class ConfigManager {
 
         // Load user config
         val userConfig = getUserConfig()
+        val environmentConfig =
+            ConfigFactory.parseMap(
+                buildMap {
+                    System.getenv("SUWAIRO_AUTH_MODE")?.trim()?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.authMode", it.uppercase())
+                    }
+                    System.getenv("SUWAIRO_AUTH_USERNAME")?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.authUsername", it)
+                    }
+                    System.getenv("SUWAIRO_AUTH_PASSWORD")?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.authPassword", it)
+                    }
+                    System.getenv("SUWAIRO_SSO_ISSUER_URL")?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.ssoIssuerUrl", it)
+                    }
+                    System.getenv("SUWAIRO_SSO_CLIENT_ID")?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.ssoClientId", it)
+                    }
+                    System.getenv("SUWAIRO_SSO_CLIENT_SECRET")?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.ssoClientSecret", it)
+                    }
+                    System.getenv("SUWAIRO_SSO_DEFAULT_ROLE")?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.ssoDefaultRole", it)
+                    }
+                    System.getenv("SUWAIRO_SSO_SCOPE")?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.ssoScope", it)
+                    }
+                    System.getenv("SUWAIRO_SSO_PUBLIC_URL")?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.ssoPublicUrl", it)
+                    }
+                },
+            )
 
         val config =
             ConfigFactory
                 .empty()
+                .withFallback(environmentConfig)
                 .withFallback(baseConfig)
                 .withFallback(userConfig)
                 .withFallback(compatConfig)

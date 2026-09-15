@@ -38,12 +38,12 @@ import suwayomi.tachidesk.manga.model.dataclass.MangaDataClass
 import suwayomi.tachidesk.manga.model.table.MangaStatus
 import suwayomi.tachidesk.server.serverConfig
 import suwayomi.tachidesk.util.HAScheduler
+import suwayomi.tachidesk.util.validateCronExpression
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.util.Date
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.absoluteValue
-import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
 
 @OptIn(FlowPreview::class)
@@ -93,7 +93,7 @@ class Updater : IUpdater {
     private var currentUpdateTaskId = ""
 
     init {
-        serverConfig.subscribeTo(serverConfig.globalUpdateInterval, ::scheduleUpdateTask)
+        serverConfig.subscribeTo(serverConfig.globalUpdateCron, ::scheduleUpdateTask)
         serverConfig.subscribeTo(
             serverConfig.maxSourcesInParallel,
             { newMaxPermits ->
@@ -140,7 +140,7 @@ class Updater : IUpdater {
             }
 
             logger.info {
-                "Trigger global update (interval= ${serverConfig.globalUpdateInterval.value}h, lastAutomatedUpdate= ${Date(
+                "Trigger global update (cron= ${serverConfig.globalUpdateCron.value}, lastAutomatedUpdate= ${Date(
                     lastAutomatedUpdate,
                 )})"
             }
@@ -150,41 +150,20 @@ class Updater : IUpdater {
         }
     }
 
-    @OptIn(DelicateCoroutinesApi::class)
     fun scheduleUpdateTask() {
-        HAScheduler.deschedule(currentUpdateTaskId)
+        if (currentUpdateTaskId.isNotBlank()) {
+            HAScheduler.descheduleCron(currentUpdateTaskId)
+            currentUpdateTaskId = ""
+        }
 
-        val isAutoUpdateDisabled = serverConfig.globalUpdateInterval.value == 0.0
-        if (isAutoUpdateDisabled) {
+        val cronExpression = serverConfig.globalUpdateCron.value
+        if (cronExpression.isBlank()) {
             return
         }
 
-        val updateInterval = serverConfig.globalUpdateInterval.value.hours.inWholeMilliseconds
-        val lastAutomatedUpdate = getLastAutomatedUpdateTimestamp()
-        val isInitialScheduling = lastAutomatedUpdate == 0L
-
-        val timeToNextExecution =
-            if (!isInitialScheduling) {
-                (updateInterval - (System.currentTimeMillis() - lastAutomatedUpdate)).mod(updateInterval)
-            } else {
-                updateInterval
-            }
-
-        if (isInitialScheduling) {
-            saveLastAutomatedUpdateTimestamp()
-        }
-
-        val wasPreviousUpdateTriggered =
-            System.currentTimeMillis() - (
-                if (!isInitialScheduling) lastAutomatedUpdate else System.currentTimeMillis()
-            ) < updateInterval
-        if (!wasPreviousUpdateTriggered) {
-            GlobalScope.launch {
-                autoUpdateTask()
-            }
-        }
-
-        currentUpdateTaskId = HAScheduler.schedule(::autoUpdateTask, updateInterval, timeToNextExecution, "global-update")
+        val validationError = validateCronExpression(cronExpression)
+        require(validationError == null) { validationError ?: "Invalid cron expression" }
+        currentUpdateTaskId = HAScheduler.scheduleCron(::autoUpdateTask, cronExpression, "global-update")
     }
 
     private fun isRunning(): Boolean =
@@ -375,24 +354,6 @@ class Updater : IUpdater {
                     .asSequence()
                     .filter { it.updateStrategy == UpdateStrategy.ALWAYS_UPDATE }
                     .filter {
-                        if (serverConfig.excludeUnreadChapters.value) {
-                            (it.unreadCount ?: 0L) == 0L
-                        } else {
-                            true
-                        }
-                    }.filter {
-                        if (it.initialized && serverConfig.excludeNotStarted.value) {
-                            it.lastReadAt != null
-                        } else {
-                            true
-                        }
-                    }.filter {
-                        if (serverConfig.excludeCompleted.value) {
-                            it.status != MangaStatus.COMPLETED.name
-                        } else {
-                            true
-                        }
-                    }.filter {
                         forceAll ||
                             !excludedCategories.any { category ->
                                 mangasToCategoriesMap[it.id]?.contains(category) == true

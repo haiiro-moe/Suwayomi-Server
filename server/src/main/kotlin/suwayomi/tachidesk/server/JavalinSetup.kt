@@ -18,6 +18,7 @@ import io.javalin.http.Context
 import io.javalin.http.HandlerType
 import io.javalin.http.HttpStatus
 import io.javalin.http.NotFoundResponse
+import io.javalin.http.BadRequestResponse
 import io.javalin.http.RedirectResponse
 import io.javalin.http.UnauthorizedResponse
 import io.javalin.json.JavalinJackson3
@@ -37,9 +38,12 @@ import suwayomi.tachidesk.graphql.GraphQL
 import suwayomi.tachidesk.graphql.types.AuthMode
 import suwayomi.tachidesk.i18n.LocalizationHelper
 import suwayomi.tachidesk.manga.MangaAPI
+import suwayomi.tachidesk.global.impl.util.Jwt
 import suwayomi.tachidesk.opds.OpdsAPI
 import suwayomi.tachidesk.server.user.ForbiddenException
+import suwayomi.tachidesk.server.user.SsoService
 import suwayomi.tachidesk.server.user.UnauthorizedException
+import suwayomi.tachidesk.server.user.UserService
 import suwayomi.tachidesk.server.user.UserType
 import suwayomi.tachidesk.server.user.getUserFromContext
 import suwayomi.tachidesk.server.user.getUserFromWsContext
@@ -181,6 +185,80 @@ object JavalinSetup {
     fun RoutesConfig.defineCore() {
         val loginPath = ServerSubpath.maybeAddAsPrefix("/login.html")
 
+        get(ServerSubpath.maybeAddAsPrefix("/brand/logo")) { ctx ->
+            val logo = BrandConfig.logoFile ?: throw NotFoundResponse()
+            ctx.contentType(BrandConfig.logoContentType)
+            ctx.result(logo.inputStream())
+        }
+
+        // SSO (OIDC authorization code flow)
+        val ssoLoginPath = ServerSubpath.maybeAddAsPrefix("/sso/login")
+        val ssoCallbackPath = ServerSubpath.maybeAddAsPrefix("/sso/callback")
+
+        get(ssoLoginPath) { ctx ->
+            if (!SsoService.isConfigured()) {
+                throw BadRequestResponse("SSO is not configured")
+            }
+
+            val discovery = kotlinx.coroutines.runBlocking { SsoService.discovery() }
+            val state = java.security.SecureRandom().let { random ->
+                val bytes = ByteArray(24)
+                random.nextBytes(bytes)
+                java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+            }
+            ctx.sessionAttribute("sso-state", state)
+
+            val redirectUri = SsoService.redirectUri()
+            val authorizeUrl =
+                mapOf(
+                    "response_type" to "code",
+                    "client_id" to SsoService.clientId(),
+                    "redirect_uri" to redirectUri,
+                    "scope" to SsoService.scope(),
+                    "state" to state,
+                ).entries.joinToString("&") { (key, value) ->
+                    "${URLEncoder.encode(key, Charsets.UTF_8)}=${URLEncoder.encode(value, Charsets.UTF_8)}"
+                }
+
+            ctx.header("Location", "${discovery.authorizationEndpoint}?$authorizeUrl")
+            throw RedirectResponse(HttpStatus.FOUND)
+        }
+
+        get(ssoCallbackPath) { ctx ->
+            if (!SsoService.isConfigured()) {
+                throw BadRequestResponse("SSO is not configured")
+            }
+
+            val error = ctx.queryParam("error")
+            if (error != null) {
+                logger.warn { "SSO login failed: provider returned error $error" }
+                ctx.header("Location", "$loginPath?ssoError=1")
+                throw RedirectResponse(HttpStatus.SEE_OTHER)
+            }
+
+            val code =
+                ctx.queryParam("code")
+                    ?: throw BadRequestResponse("Missing authorization code")
+            val state = ctx.queryParam("state")
+            val expectedState = ctx.sessionAttribute<String>("sso-state")
+            if (state == null || expectedState == null || state != expectedState) {
+                throw UnauthorizedResponse("Invalid SSO state")
+            }
+            ctx.sessionAttribute("sso-state", null)
+
+            val ssoUser = kotlinx.coroutines.runBlocking { SsoService.exchangeCode(code, SsoService.redirectUri()) }
+            val userId = SsoService.resolveUser(ssoUser)
+            if (userId == null) {
+                ctx.header("Location", "$loginPath?ssoError=2")
+                throw RedirectResponse(HttpStatus.SEE_OTHER)
+            }
+
+            val jwt = Jwt.generateJwt(userId)
+            ctx.cookie("suwayomi-server-token", jwt.accessToken, Int.MAX_VALUE)
+            ctx.header("Location", ServerSubpath.maybeAddAsPrefix("/"))
+            throw RedirectResponse(HttpStatus.SEE_OTHER)
+        }
+
         get(loginPath) { ctx ->
             val locale: Locale = LocalizationHelper.ctxToLocale(ctx)
             ctx.header("content-type", "text/html")
@@ -190,6 +268,8 @@ object JavalinSetup {
                 "Login.jte",
                 mapOf(
                     "locale" to locale,
+                    "brandName" to BrandConfig.name,
+                    "logoUrl" to BrandConfig.logoFile?.let { ServerSubpath.maybeAddAsPrefix("/brand/logo") },
                     "error" to "",
                 ),
             )
@@ -199,8 +279,12 @@ object JavalinSetup {
             val username = ctx.formParam("user")
             val password = ctx.formParam("pass")
             val isValid =
-                username == serverConfig.authUsername.value &&
-                    password == serverConfig.authPassword.value
+                if (serverConfig.authMode.value == AuthMode.UI_LOGIN || serverConfig.authMode.value == AuthMode.SIMPLE_LOGIN) {
+                    username != null && password != null && UserService.authenticate(username, password) != null
+                } else {
+                    username == serverConfig.authUsername.value &&
+                        password == serverConfig.authPassword.value
+                }
 
             if (isValid) {
                 val redirect = ctx.queryParam("redirect") ?: ServerSubpath.maybeAddAsPrefix("/")
@@ -223,6 +307,8 @@ object JavalinSetup {
                 "Login.jte",
                 mapOf(
                     "locale" to locale,
+                    "brandName" to BrandConfig.name,
+                    "logoUrl" to BrandConfig.logoFile?.let { ServerSubpath.maybeAddAsPrefix("/brand/logo") },
                     "error" to "Invalid username or password",
                 ),
             )
@@ -239,8 +325,10 @@ object JavalinSetup {
                     listOf(".png", ".jpg", ".ico").any { ctx.path().endsWith(it) }
             val isPreFlight = ctx.method() == HandlerType.OPTIONS
             val isApi = ctx.path().startsWith(ServerSubpath.maybeAddAsPrefix("/api/"))
+            val isSso =
+                ctx.path().startsWith(ServerSubpath.maybeAddAsPrefix("/sso/"))
 
-            val requiresAuthentication = !isPreFlight && !isPageIcon && !isWebManifest
+            val requiresAuthentication = !isPreFlight && !isPageIcon && !isWebManifest && !isSso
             if (!requiresAuthentication) {
                 return@beforeMatched
             }

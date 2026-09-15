@@ -13,6 +13,7 @@ import suwayomi.tachidesk.server.generated.BuildConfig
 import suwayomi.tachidesk.server.serverConfig
 import suwayomi.tachidesk.server.util.Platform
 import suwayomi.tachidesk.server.util.WebInterfaceManager
+import suwayomi.tachidesk.server.user.SsoService
 import java.util.concurrent.CompletableFuture
 
 class InfoQuery {
@@ -26,6 +27,7 @@ class InfoQuery {
         val github: String,
         val discord: String,
         val platformInfo: PlatformInfo,
+        val ssoEnabled: Boolean = false,
     )
 
     fun aboutServer(): AboutServerPayload =
@@ -38,6 +40,8 @@ class InfoQuery {
             BuildConfig.GITHUB,
             BuildConfig.DISCORD,
             PlatformInfo(Platform.current),
+            serverConfig.authMode.value == suwayomi.tachidesk.graphql.types.AuthMode.SSO &&
+                SsoService.isConfigured(),
         )
 
     data class CheckForServerUpdatesPayload(

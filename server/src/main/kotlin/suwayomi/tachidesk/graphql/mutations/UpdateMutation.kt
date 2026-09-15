@@ -5,11 +5,13 @@ package suwayomi.tachidesk.graphql.mutations
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeout
 import suwayomi.tachidesk.graphql.directives.RequireAuth
+import suwayomi.tachidesk.graphql.directives.RequirePermission
 import suwayomi.tachidesk.graphql.types.LibraryUpdateStatus
 import suwayomi.tachidesk.graphql.types.UpdateStatus
 import suwayomi.tachidesk.manga.impl.Category
 import suwayomi.tachidesk.manga.impl.update.IUpdater
 import suwayomi.tachidesk.server.JavalinSetup.future
+import suwayomi.tachidesk.server.user.PermissionNodes
 import uy.kohesive.injekt.injectLazy
 import java.util.concurrent.CompletableFuture
 import kotlin.time.Duration.Companion.seconds
@@ -27,7 +29,7 @@ class UpdateMutation {
         val updateStatus: LibraryUpdateStatus,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.UPDATES_TRIGGER)
     fun updateLibrary(input: UpdateLibraryInput): CompletableFuture<UpdateLibraryPayload?> {
         updater.addCategoriesToUpdateQueue(
             Category.getCategoryList().filter { input.categories?.contains(it.id) ?: true },
@@ -57,7 +59,7 @@ class UpdateMutation {
         val updateStatus: UpdateStatus,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.UPDATES_TRIGGER)
     fun updateLibraryManga(input: UpdateLibraryMangaInput): CompletableFuture<UpdateLibraryMangaPayload?> {
         updateLibrary(
             UpdateLibraryInput(
@@ -87,7 +89,7 @@ class UpdateMutation {
         val updateStatus: UpdateStatus,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.UPDATES_TRIGGER)
     fun updateCategoryManga(input: UpdateCategoryMangaInput): CompletableFuture<UpdateCategoryMangaPayload?> {
         updateLibrary(
             UpdateLibraryInput(
@@ -115,7 +117,7 @@ class UpdateMutation {
         val clientMutationId: String?,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.UPDATES_TRIGGER)
     fun updateStop(input: UpdateStopInput): UpdateStopPayload {
         updater.reset()
         return UpdateStopPayload(input.clientMutationId)

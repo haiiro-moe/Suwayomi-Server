@@ -20,7 +20,10 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import suwayomi.tachidesk.graphql.directives.RequireAuthDirectiveWiring
+import suwayomi.tachidesk.graphql.directives.RequirePermissionDirectiveWiring
 import suwayomi.tachidesk.graphql.mutations.BackupMutation
+import suwayomi.tachidesk.graphql.mutations.CategoryAccessMutation
+import suwayomi.tachidesk.graphql.mutations.CategoryAccessQuery
 import suwayomi.tachidesk.graphql.mutations.CategoryMutation
 import suwayomi.tachidesk.graphql.mutations.ChapterMutation
 import suwayomi.tachidesk.graphql.mutations.DownloadMutation
@@ -32,11 +35,20 @@ import suwayomi.tachidesk.graphql.mutations.KoreaderSyncMutation
 import suwayomi.tachidesk.graphql.mutations.MangaMutation
 import suwayomi.tachidesk.graphql.mutations.MetaMutation
 import suwayomi.tachidesk.graphql.mutations.SettingsMutation
+import suwayomi.tachidesk.graphql.mutations.RequestMutation
 import suwayomi.tachidesk.graphql.mutations.SourceMutation
 import suwayomi.tachidesk.graphql.mutations.SyncMutation
 import suwayomi.tachidesk.graphql.mutations.TrackMutation
 import suwayomi.tachidesk.graphql.mutations.UpdateMutation
+import suwayomi.tachidesk.graphql.mutations.UserAdminMutation
 import suwayomi.tachidesk.graphql.mutations.UserMutation
+import suwayomi.tachidesk.graphql.mutations.UserRoleAdminMutation
+import suwayomi.tachidesk.graphql.mutations.UserSettingsMutation
+import suwayomi.tachidesk.graphql.queries.RequestPreviewQuery
+import suwayomi.tachidesk.graphql.queries.RequestQuery
+import suwayomi.tachidesk.graphql.queries.RoleQuery
+import suwayomi.tachidesk.graphql.queries.UserQuery
+import suwayomi.tachidesk.graphql.queries.UserSettingsQuery
 import suwayomi.tachidesk.graphql.mutations.WebviewMutation
 import suwayomi.tachidesk.graphql.queries.BackupQuery
 import suwayomi.tachidesk.graphql.queries.CategoryQuery
@@ -69,7 +81,11 @@ import kotlin.time.Duration
 class CustomSchemaGeneratorHooks : FlowSubscriptionSchemaGeneratorHooks() {
     override val wiringFactory =
         KotlinDirectiveWiringFactory(
-            manualWiring = mapOf("requireAuth" to RequireAuthDirectiveWiring()),
+            manualWiring =
+                mapOf(
+                    "requireAuth" to RequireAuthDirectiveWiring(),
+                    "requirePermission" to RequirePermissionDirectiveWiring(),
+                ),
         )
 
     override fun willGenerateGraphQLType(type: KType): GraphQLType? =
@@ -103,6 +119,7 @@ object GraphQLSchemaProvider {
                     listOf(
                         TopLevelObject(BackupQuery()),
                         TopLevelObject(CategoryQuery()),
+                        TopLevelObject(CategoryAccessQuery()),
                         TopLevelObject(ChapterQuery()),
                         TopLevelObject(DownloadQuery()),
                         TopLevelObject(ExtensionQuery()),
@@ -116,10 +133,18 @@ object GraphQLSchemaProvider {
                         TopLevelObject(SyncQuery()),
                         TopLevelObject(TrackQuery()),
                         TopLevelObject(UpdateQuery()),
+                        TopLevelObject(RoleQuery()),
+                        TopLevelObject(RequestQuery()),
+                        TopLevelObject(RequestPreviewQuery()),
+                        TopLevelObject(UserQuery()),
+                        TopLevelObject(UserSettingsQuery()),
                     ),
                 mutations =
                     listOf(
                         TopLevelObject(BackupMutation()),
+                        TopLevelObject(CategoryAccessMutation()),
+                        TopLevelObject(UserAdminMutation()),
+                        TopLevelObject(UserRoleAdminMutation()),
                         TopLevelObject(CategoryMutation()),
                         TopLevelObject(ChapterMutation()),
                         TopLevelObject(DownloadMutation()),
@@ -136,6 +161,8 @@ object GraphQLSchemaProvider {
                         TopLevelObject(TrackMutation()),
                         TopLevelObject(UpdateMutation()),
                         TopLevelObject(UserMutation()),
+                        TopLevelObject(RequestMutation()),
+                        TopLevelObject(UserSettingsMutation()),
                         TopLevelObject(WebviewMutation()),
                     ),
                 subscriptions =

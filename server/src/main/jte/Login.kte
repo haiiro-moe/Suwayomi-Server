@@ -1,7 +1,10 @@
 @import suwayomi.tachidesk.i18n.MR
 @import suwayomi.tachidesk.server.generated.BuildConfig
+@import suwayomi.tachidesk.server.BrandConfig
 
 @param locale: java.util.Locale
+@param brandName: String = BrandConfig.name
+@param logoUrl: String? = null
 @param error: String
 
 <!DOCTYPE html>
@@ -147,7 +150,10 @@
 </head>
 <body>
     <header>
-        <h1>Suwayomi</h1>
+        @if (logoUrl != null)
+            <img src="${logoUrl}" alt="${brandName}" style="height: 2rem; vertical-align: middle; margin-right: 0.5rem;" />
+        @endif
+        <h1 style="display: inline;">${brandName}</h1>
     </header>
     <main>
         <div class="error">${error}</div>
@@ -165,7 +171,7 @@
         </form>
     </main>
     <footer>
-        <p>Suwayomi: ${MR.strings.label_version.localized(locale, BuildConfig.VERSION)}</p>
+        <p>${brandName}: ${MR.strings.label_version.localized(locale, BuildConfig.VERSION)}</p>
     </footer>
 </body>
 </html>

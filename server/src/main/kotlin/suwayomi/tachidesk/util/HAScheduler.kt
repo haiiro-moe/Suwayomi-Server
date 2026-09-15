@@ -21,6 +21,19 @@ import kotlin.time.Duration.Companion.seconds
 
 val cronParser = CronParser(CronDefinitionBuilder.instanceDefinitionFor(CRON4J))
 
+fun validateCronExpression(cronExpr: String): String? {
+    if (cronExpr.isBlank()) {
+        return "Cron expression must not be empty"
+    }
+    return try {
+        cronParser.parse(cronExpr)
+        null
+    } catch (exception: RuntimeException) {
+        "Invalid cron expression: $cronExpr"
+    }
+}
+
+
 abstract class BaseHATask(
     val id: String,
     val execute: () -> Unit,

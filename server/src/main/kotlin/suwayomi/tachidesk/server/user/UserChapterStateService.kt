@@ -1,0 +1,114 @@
+package suwayomi.tachidesk.server.user
+
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.update
+import suwayomi.tachidesk.manga.model.table.ChapterTable
+import suwayomi.tachidesk.server.database.DBManager
+import suwayomi.tachidesk.server.user.model.UserChapterStateTable
+import java.time.Instant
+
+data class UserChapterState(
+    val isRead: Boolean,
+    val isBookmarked: Boolean,
+    val lastPageRead: Int,
+    val lastReadAt: Long,
+)
+
+object UserChapterStateService {
+    fun get(userId: Int, chapterId: Int): UserChapterState? =
+        transaction(DBManager.db) {
+            UserChapterStateTable
+                .selectAll()
+                .where {
+                    (UserChapterStateTable.user eq userId) and
+                        (UserChapterStateTable.chapter eq chapterId)
+                }.firstOrNull()
+                ?.toState()
+        }
+
+    fun getForUser(userId: Int, chapterIds: List<Int>): Map<Int, UserChapterState> {
+        if (chapterIds.isEmpty()) return emptyMap()
+        return transaction(DBManager.db) {
+            UserChapterStateTable
+                .selectAll()
+                .where {
+                    (UserChapterStateTable.user eq userId) and
+                        (UserChapterStateTable.chapter inList chapterIds)
+                }.associate { it[UserChapterStateTable.chapter].value to it.toState() }
+        }
+    }
+
+    fun getOrDefault(userId: Int, chapterId: Int): UserChapterState =
+        get(userId, chapterId) ?: UserChapterState(false, false, 0, 0)
+
+    @Deprecated("Legacy shared chapter state must not be exposed across users")
+    fun getOrLegacy(userId: Int, chapterId: Int): UserChapterState = getOrDefault(userId, chapterId)
+
+    fun migrateLegacyStateToOwner(ownerId: Int) {
+        transaction(DBManager.db) {
+            ChapterTable.selectAll().forEach { row ->
+                val chapterId = row[ChapterTable.id].value
+                if (UserChapterStateTable.selectAll().where {
+                    (UserChapterStateTable.user eq ownerId) and
+                        (UserChapterStateTable.chapter eq chapterId)
+                }.empty()) {
+                    if (row[ChapterTable.isRead] || row[ChapterTable.isBookmarked] ||
+                        row[ChapterTable.lastPageRead] > 0 || row[ChapterTable.lastReadAt] > 0) {
+                        UserChapterStateTable.insert {
+                            it[user] = ownerId
+                            it[chapter] = chapterId
+                            it[isRead] = row[ChapterTable.isRead]
+                            it[isBookmarked] = row[ChapterTable.isBookmarked]
+                            it[lastPageRead] = row[ChapterTable.lastPageRead]
+                            it[lastReadAt] = row[ChapterTable.lastReadAt]
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fun update(userId: Int, chapterId: Int, read: Boolean?, bookmarked: Boolean?, lastPageRead: Int?) {
+        transaction(DBManager.db) {
+            val existing =
+                UserChapterStateTable
+                    .selectAll()
+                    .where {
+                        (UserChapterStateTable.user eq userId) and
+                            (UserChapterStateTable.chapter eq chapterId)
+                    }.firstOrNull()
+            val current = existing?.toState() ?: getOrDefault(userId, chapterId)
+            val now = if (lastPageRead != null || read != null) Instant.now().epochSecond else current.lastReadAt
+            if (existing == null) {
+                UserChapterStateTable.insert {
+                    it[user] = userId
+                    it[chapter] = chapterId
+                    it[isRead] = read ?: current.isRead
+                    it[isBookmarked] = bookmarked ?: current.isBookmarked
+                    it[UserChapterStateTable.lastPageRead] = lastPageRead ?: current.lastPageRead
+                    it[lastReadAt] = now
+                }
+            } else {
+                UserChapterStateTable.update({ UserChapterStateTable.id eq existing[UserChapterStateTable.id] }) {
+                    read?.let { value -> it[isRead] = value }
+                    bookmarked?.let { value -> it[isBookmarked] = value }
+                    lastPageRead?.let { value -> it[UserChapterStateTable.lastPageRead] = value }
+                    if (read != null || lastPageRead != null) it[lastReadAt] = now
+                }
+            }
+        }
+    }
+
+    private fun org.jetbrains.exposed.v1.core.ResultRow.toState() =
+        UserChapterState(
+            this[UserChapterStateTable.isRead],
+            this[UserChapterStateTable.isBookmarked],
+            this[UserChapterStateTable.lastPageRead],
+            this[UserChapterStateTable.lastReadAt],
+        )
+}

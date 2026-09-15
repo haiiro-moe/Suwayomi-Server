@@ -8,7 +8,8 @@ import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
-import suwayomi.tachidesk.graphql.directives.RequireAuth
+import suwayomi.tachidesk.graphql.directives.RequirePermission
+import suwayomi.tachidesk.server.user.PermissionNodes
 import suwayomi.tachidesk.graphql.types.TrackRecordType
 import suwayomi.tachidesk.graphql.types.TrackerType
 import suwayomi.tachidesk.manga.impl.track.Track
@@ -30,7 +31,7 @@ class TrackMutation {
         val tracker: TrackerType,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.SETTINGS_TRACKING)
     fun loginTrackerOAuth(input: LoginTrackerOAuthInput): CompletableFuture<LoginTrackerOAuthPayload> {
         val tracker =
             requireNotNull(TrackerManager.getTracker(input.trackerId)) {
@@ -60,7 +61,7 @@ class TrackMutation {
         val tracker: TrackerType,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.SETTINGS_TRACKING)
     fun loginTrackerCredentials(input: LoginTrackerCredentialsInput): CompletableFuture<LoginTrackerCredentialsPayload> {
         val tracker =
             requireNotNull(TrackerManager.getTracker(input.trackerId)) {
@@ -88,7 +89,7 @@ class TrackMutation {
         val tracker: TrackerType,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.SETTINGS_TRACKING)
     fun logoutTracker(input: LogoutTrackerInput): CompletableFuture<LogoutTrackerPayload> {
         val tracker =
             requireNotNull(TrackerManager.getTracker(input.trackerId)) {
@@ -122,7 +123,7 @@ class TrackMutation {
         val trackRecord: TrackRecordType,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.SETTINGS_TRACKING)
     fun bindTrack(input: BindTrackInput): CompletableFuture<BindTrackPayload> {
         val (clientMutationId, mangaId, trackerId, remoteId, private) = input
 
@@ -159,7 +160,7 @@ class TrackMutation {
         val trackRecord: TrackRecordType,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.SETTINGS_TRACKING)
     fun bindTrackRecord(input: BindTrackRecordInput): CompletableFuture<BindTrackRecordPayload?> {
         val (clientMutationId, mangaId, trackRecordId) = input
 
@@ -188,7 +189,7 @@ class TrackMutation {
         val trackRecord: TrackRecordType,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.SETTINGS_TRACKING)
     fun fetchTrack(input: FetchTrackInput): CompletableFuture<FetchTrackPayload> {
         val (clientMutationId, recordId) = input
 
@@ -221,7 +222,7 @@ class TrackMutation {
         val trackRecord: TrackRecordType?,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.SETTINGS_TRACKING)
     fun unbindTrack(input: UnbindTrackInput): CompletableFuture<UnbindTrackPayload> {
         val (clientMutationId, recordId, deleteRemoteTrack) = input
 
@@ -252,7 +253,7 @@ class TrackMutation {
         val trackRecords: List<TrackRecordType>,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.SETTINGS_TRACKING)
     fun trackProgress(input: TrackProgressInput): CompletableFuture<TrackProgressPayload?> {
         val (clientMutationId, mangaId) = input
 
@@ -293,7 +294,7 @@ class TrackMutation {
         val trackRecord: TrackRecordType?,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.SETTINGS_TRACKING)
     fun updateTrack(input: UpdateTrackInput): CompletableFuture<UpdateTrackPayload> =
         future {
             Track.update(
