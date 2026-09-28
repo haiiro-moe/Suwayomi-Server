@@ -74,6 +74,7 @@ import suwayomi.tachidesk.graphql.subscriptions.DownloadSubscription
 import suwayomi.tachidesk.graphql.subscriptions.InfoSubscription
 import suwayomi.tachidesk.graphql.subscriptions.SyncSubscription
 import suwayomi.tachidesk.graphql.subscriptions.UpdateSubscription
+import suwayomi.tachidesk.graphql.subscriptions.UserSubscription
 import kotlin.reflect.KClass
 import kotlin.reflect.KType
 import kotlin.time.Duration
@@ -171,6 +172,7 @@ object GraphQLSchemaProvider {
                         TopLevelObject(InfoSubscription()),
                         TopLevelObject(SyncSubscription()),
                         TopLevelObject(UpdateSubscription()),
+                        TopLevelObject(UserSubscription()),
                     ),
             )
         }

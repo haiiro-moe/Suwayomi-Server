@@ -50,7 +50,7 @@ object UserMessageService {
                 it[createdAt] = Instant.now().epochSecond
             }
             toMessage(UserMessageTable.selectAll().where { UserMessageTable.id eq id }.single())
-        }
+        }.also { UserEventBus.messagesChanged(senderId, receiverId) }
     }
 
     fun conversation(userId: Int, otherUserId: Int): List<Message> = transaction(DBManager.db) {
@@ -61,11 +61,22 @@ object UserMessageService {
     }
 
     fun markRead(userId: Int, messageId: Int) {
-        transaction(DBManager.db) {
-            UserMessageTable.update({ (UserMessageTable.id eq messageId) and (UserMessageTable.receiver eq userId) }) {
-                it[readAt] = Instant.now().epochSecond
-            }
-        }
+        val senderId =
+            transaction(DBManager.db) {
+                val message =
+                    UserMessageTable
+                        .selectAll()
+                        .where {
+                            (UserMessageTable.id eq messageId) and (UserMessageTable.receiver eq userId) and
+                                UserMessageTable.readAt.isNull()
+                        }.firstOrNull() ?: return@transaction null
+                UserMessageTable.update({ UserMessageTable.id eq messageId }) {
+                    it[readAt] = Instant.now().epochSecond
+                }
+                message[UserMessageTable.sender].value
+            } ?: return
+
+        UserEventBus.messagesChanged(userId, senderId)
     }
 
     fun unreadCount(userId: Int): Long = transaction(DBManager.db) {
