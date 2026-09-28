@@ -19,6 +19,10 @@ class RequestQuery {
         val mangaThumbnailUrl: String?,
         val createdAt: Long,
         val status: String,
+        val decidedById: Int?,
+        val decidedByUsername: String?,
+        val decidedByDisplayName: String?,
+        val decidedAt: Long?,
     )
 
     @RequirePermission(PermissionNodes.REQUESTS_READ)
@@ -35,7 +39,14 @@ class RequestQuery {
                 it.mangaThumbnailUrl,
                 it.createdAt,
                 it.status,
+                it.decidedById,
+                it.decidedByUsername,
+                it.decidedByDisplayName,
+                it.decidedAt,
             )
         }
     }
+
+    @RequirePermission(PermissionNodes.REQUESTS_READ)
+    fun pendingMangaRequestCount(): Int = MangaRequestService.pendingCount().toInt()
 }

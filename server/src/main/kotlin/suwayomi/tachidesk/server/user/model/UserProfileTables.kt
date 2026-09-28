@@ -34,6 +34,8 @@ object MangaRequestTable : IntIdTable("manga_requests") {
     val manga = reference("manga_id", MangaTable, onDelete = ReferenceOption.CASCADE)
     val createdAt = long("created_at")
     val status = varchar("status", 32).default("PENDING")
+    val decidedBy = integer("decided_by_id").nullable()
+    val decidedAt = long("decided_at").nullable()
 
     init {
         uniqueIndex(user, manga)

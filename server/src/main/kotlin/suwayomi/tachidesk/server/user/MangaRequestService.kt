@@ -3,6 +3,7 @@ package suwayomi.tachidesk.server.user
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
@@ -11,6 +12,7 @@ import org.jetbrains.exposed.v1.jdbc.update
 import org.jetbrains.exposed.v1.jdbc.upsert
 import suwayomi.tachidesk.manga.impl.Library
 import suwayomi.tachidesk.manga.impl.Manga
+import suwayomi.tachidesk.manga.impl.MangaList.proxyThumbnailUrl
 import suwayomi.tachidesk.manga.impl.download.DownloadManager
 import suwayomi.tachidesk.manga.model.table.ChapterTable
 import suwayomi.tachidesk.manga.model.table.MangaTable
@@ -34,6 +36,10 @@ object MangaRequestService {
         val mangaThumbnailUrl: String?,
         val createdAt: Long,
         val status: String,
+        val decidedById: Int?,
+        val decidedByUsername: String?,
+        val decidedByDisplayName: String?,
+        val decidedAt: Long?,
     )
 
     fun request(userId: Int, mangaId: Int): Int {
@@ -55,6 +61,7 @@ object MangaRequestService {
                 }
             }
         }
+        UserEventBus.requestsChanged()
         return transaction(DBManager.db) {
             MangaRequestTable
                 .selectAll()
@@ -65,6 +72,12 @@ object MangaRequestService {
 
     fun requests(viewerId: Int): List<MangaRequest> = transaction(DBManager.db) {
         val visible = CategoryAccessService.readableMangaIds(viewerId).toSet()
+        val deciderIds = MangaRequestTable.select(MangaRequestTable.decidedBy).mapNotNull { it[MangaRequestTable.decidedBy] }.toSet()
+        val deciders =
+            UserTable
+                .selectAll()
+                .where { UserTable.id inList deciderIds }
+                .associate { it[UserTable.id].value to (it[UserTable.username] to it[UserTable.displayName]) }
 
         MangaRequestTable
             .innerJoin(MangaTable)
@@ -80,9 +93,13 @@ object MangaRequestService {
                     displayName = row[UserTable.displayName],
                     mangaId = mangaId,
                     mangaTitle = if (mangaId in visible) row[MangaTable.title] else "",
-                    mangaThumbnailUrl = if (mangaId in visible) row[MangaTable.thumbnail_url] else null,
+                    mangaThumbnailUrl = if (mangaId in visible && row[MangaTable.thumbnail_url] != null) proxyThumbnailUrl(mangaId) else null,
                     createdAt = row[MangaRequestTable.createdAt],
                     status = row[MangaRequestTable.status],
+                    decidedById = row[MangaRequestTable.decidedBy],
+                    decidedByUsername = row[MangaRequestTable.decidedBy]?.let { deciders[it]?.first },
+                    decidedByDisplayName = row[MangaRequestTable.decidedBy]?.let { deciders[it]?.second },
+                    decidedAt = row[MangaRequestTable.decidedAt],
                 )
             }
     }
@@ -106,13 +123,21 @@ object MangaRequestService {
         transaction(DBManager.db) {
             MangaRequestTable.update({ MangaRequestTable.id eq requestId }) {
                 it[MangaRequestTable.status] = if (approve) STATUS_APPROVED else STATUS_DENIED
+                it[MangaRequestTable.decidedBy] = viewerId
+                it[MangaRequestTable.decidedAt] = Instant.now().epochSecond
             }
         }
+        UserEventBus.requestsChanged()
 
         if (approve) {
             approveRequest(requestUserId, mangaId)
         }
     }
+
+    fun pendingCount(): Long =
+        transaction(DBManager.db) {
+            MangaRequestTable.selectAll().where { MangaRequestTable.status eq STATUS_PENDING }.count()
+        }
 
     private fun approveRequest(requestUserId: Int, mangaId: Int) {
         // fully update the manga from its source
