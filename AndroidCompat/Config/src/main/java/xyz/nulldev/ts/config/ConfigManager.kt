@@ -100,6 +100,21 @@ open class ConfigManager {
                     System.getenv("SUWAIRO_SSO_PUBLIC_URL")?.takeIf { it.isNotEmpty() }?.let {
                         put("server.ssoPublicUrl", it)
                     }
+                    // FlareSolverr (or a compatible solver like Byparr); both the SUWAIRO_ prefixed and the
+                    // upstream docker image's unprefixed names are accepted
+                    mapOf(
+                        "FLARESOLVERR_ENABLED" to "server.flareSolverrEnabled",
+                        "FLARESOLVERR_URL" to "server.flareSolverrUrl",
+                        "FLARESOLVERR_TIMEOUT" to "server.flareSolverrTimeout",
+                        "FLARESOLVERR_SESSION_NAME" to "server.flareSolverrSessionName",
+                        "FLARESOLVERR_SESSION_TTL" to "server.flareSolverrSessionTtl",
+                        "FLARESOLVERR_RESPONSE_AS_FALLBACK" to "server.flareSolverrAsResponseFallback",
+                    ).forEach { (env, path) ->
+                        (System.getenv("SUWAIRO_$env") ?: System.getenv(env))
+                            ?.trim()
+                            ?.takeIf { it.isNotEmpty() }
+                            ?.let { put(path, it) }
+                    }
                 },
             )
 
