@@ -9,9 +9,9 @@ package suwayomi.tachidesk.server.database.migration
 
 import de.neonew.exposed.migrations.helpers.AddTableMigration
 import org.jetbrains.exposed.v1.core.Table
-import suwayomi.tachidesk.server.user.model.MangaRequestTable
+import suwayomi.tachidesk.server.database.migration.snapshot.MangaRequestTableV1
 
 @Suppress("ClassName", "unused")
 class M0073_MangaRequests : AddTableMigration() {
-    override val tables: Array<Table> = arrayOf(MangaRequestTable)
+    override val tables: Array<Table> = arrayOf(MangaRequestTableV1)
 }

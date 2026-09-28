@@ -14,7 +14,7 @@ class M0074_MangaRequestDecision : SQLMigration() {
     // language=sql
     override val sql: String =
         """
-        ALTER TABLE manga_requests ADD COLUMN decided_by_id INT NULL;
-        ALTER TABLE manga_requests ADD COLUMN decided_at BIGINT NULL;
+        ALTER TABLE manga_requests ADD COLUMN IF NOT EXISTS decided_by_id INT NULL;
+        ALTER TABLE manga_requests ADD COLUMN IF NOT EXISTS decided_at BIGINT NULL;
         """.trimIndent()
 }
