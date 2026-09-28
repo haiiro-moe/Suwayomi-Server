@@ -11,7 +11,6 @@ import com.expediagroup.graphql.dataloader.KotlinDataLoader
 import graphql.GraphQLContext
 import org.dataloader.DataLoader
 import org.dataloader.DataLoaderFactory
-import org.jetbrains.exposed.v1.core.Case
 import org.jetbrains.exposed.v1.core.Slf4jSqlDebugLogger
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.and
@@ -20,8 +19,6 @@ import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.greater
 import org.jetbrains.exposed.v1.core.greaterEq
 import org.jetbrains.exposed.v1.core.inList
-import org.jetbrains.exposed.v1.core.intLiteral
-import org.jetbrains.exposed.v1.core.sum
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
@@ -29,7 +26,15 @@ import suwayomi.tachidesk.graphql.types.ChapterNodeList
 import suwayomi.tachidesk.graphql.types.ChapterNodeList.Companion.toNodeList
 import suwayomi.tachidesk.graphql.types.ChapterType
 import suwayomi.tachidesk.manga.model.table.ChapterTable
+import suwayomi.tachidesk.graphql.server.getAttribute
+import suwayomi.tachidesk.server.JavalinSetup.Attribute
 import suwayomi.tachidesk.server.JavalinSetup.future
+import suwayomi.tachidesk.server.user.CategoryAccessService
+import suwayomi.tachidesk.server.user.UserChapterStateService
+import suwayomi.tachidesk.server.user.requireUser
+
+private fun visibleMangaIds(userId: Int, ids: List<Int>): List<Int> =
+    ids.intersect(CategoryAccessService.readableMangaIds(userId).toSet()).toList()
 
 class ChapterDataLoader : KotlinDataLoader<Int, ChapterType> {
     override val dataLoaderName = "ChapterDataLoader"
@@ -39,11 +44,22 @@ class ChapterDataLoader : KotlinDataLoader<Int, ChapterType> {
             future {
                 transaction {
                     addLogger(Slf4jSqlDebugLogger)
+                    val userId = graphQLContext.getAttribute(Attribute.TachideskUser).requireUser()
+                    val visibleIds =
+                        ChapterTable
+                            .select(ChapterTable.id)
+                            .where { ChapterTable.manga inList CategoryAccessService.readableMangaIds(userId) }
+                            .map { it[ChapterTable.id].value }
+                            .intersect(ids.toSet())
+                            .toList()
+                    val stateByChapterId = UserChapterStateService.getForUser(userId, visibleIds)
                     val chapters =
                         ChapterTable
                             .selectAll()
-                            .where { ChapterTable.id inList ids }
-                            .map { ChapterType(it) }
+                            .where { ChapterTable.id inList visibleIds }
+                            .map { row ->
+                                ChapterType(row).withUserState(stateByChapterId[row[ChapterTable.id].value])
+                            }
                             .associateBy { it.id }
                     ids.map { chapters[it] }
                 }
@@ -59,11 +75,16 @@ class ChaptersForMangaDataLoader : KotlinDataLoader<Int, ChapterNodeList> {
             future {
                 transaction {
                     addLogger(Slf4jSqlDebugLogger)
-                    val chaptersByMangaId =
+                    val userId = graphQLContext.getAttribute(Attribute.TachideskUser).requireUser()
+                    val rows =
                         ChapterTable
                             .selectAll()
-                            .where { ChapterTable.manga inList ids }
-                            .map { ChapterType(it) }
+                            .where { ChapterTable.manga inList visibleMangaIds(userId, ids) }
+                            .toList()
+                    val stateByChapterId = UserChapterStateService.getForUser(userId, rows.map { it[ChapterTable.id].value })
+                    val chaptersByMangaId =
+                        rows
+                            .map { row -> ChapterType(row).withUserState(stateByChapterId[row[ChapterTable.id].value]) }
                             .groupBy { it.mangaId }
                     ids.map { (chaptersByMangaId[it] ?: emptyList()).toNodeList() }
                 }
@@ -83,58 +104,24 @@ class ChapterFlagCountForMangaDataLoader : KotlinDataLoader<Int, MangaChapterSta
     override fun getDataLoader(graphQLContext: GraphQLContext): DataLoader<Int, MangaChapterStats> =
         DataLoaderFactory.newDataLoader { ids ->
             future {
+                val userId = graphQLContext.getAttribute(Attribute.TachideskUser).requireUser()
                 transaction {
                     addLogger(Slf4jSqlDebugLogger)
-
-                    val unreadCount =
-                        Case()
-                            .When(ChapterTable.isRead eq false, intLiteral(1))
-                            .Else(intLiteral(0))
-                            .sum()
-
-                    val downloadCount =
-                        Case()
-                            .When(ChapterTable.isDownloaded eq true, intLiteral(1))
-                            .Else(intLiteral(0))
-                            .sum()
-
-                    val bookmarkCount =
-                        Case()
-                            .When(ChapterTable.isBookmarked eq true, intLiteral(1))
-                            .Else(intLiteral(0))
-                            .sum()
-
-                    val statsByMangaId =
-                        ChapterTable
-                            .select(
-                                ChapterTable.manga,
-                                unreadCount,
-                                downloadCount,
-                                bookmarkCount,
-                            ).where {
-                                ChapterTable.manga inList ids
-                            }.groupBy(ChapterTable.manga)
-                            .associate {
-                                val mangaId = it[ChapterTable.manga].value
-
-                                mangaId to
-                                    MangaChapterStats(
-                                        unreadCount = it[unreadCount] ?: 0,
-                                        downloadCount = it[downloadCount] ?: 0,
-                                        bookmarkCount = it[bookmarkCount] ?: 0,
-                                    )
-                            }
-
-                    ids.map {
-                        statsByMangaId[it] ?: MangaChapterStats(
-                            unreadCount = 0,
-                            downloadCount = 0,
-                            bookmarkCount = 0,
+                    val rows = ChapterTable.selectAll().where { ChapterTable.manga inList ids }.toList()
+                    val states = UserChapterStateService.getForUser(userId, rows.map { it[ChapterTable.id].value })
+                    val statsByMangaId = rows.groupBy { it[ChapterTable.manga].value }.mapValues { (_, chapters) ->
+                        MangaChapterStats(
+                            unreadCount = chapters.count { !states[it[ChapterTable.id].value]?.isRead.orFalse() },
+                            downloadCount = chapters.count { it[ChapterTable.isDownloaded] },
+                            bookmarkCount = chapters.count { states[it[ChapterTable.id].value]?.isBookmarked.orFalse() },
                         )
                     }
+                    ids.map { statsByMangaId[it] ?: MangaChapterStats(0, 0, 0) }
                 }
             }
         }
+
+    private fun Boolean?.orFalse(): Boolean = this == true
 }
 
 class HasDuplicateChaptersForMangaDataLoader : KotlinDataLoader<Int, Boolean> {
@@ -164,42 +151,46 @@ class HasDuplicateChaptersForMangaDataLoader : KotlinDataLoader<Int, Boolean> {
         }
 }
 
+private fun userReadChapters(
+    graphQLContext: GraphQLContext,
+    ids: List<Int>,
+    latest: Boolean,
+): List<ChapterType?> {
+    val userId = graphQLContext.getAttribute(Attribute.TachideskUser).requireUser()
+    val rows = transaction {
+        ChapterTable.selectAll().where { ChapterTable.manga inList ids }.toList()
+    }
+    val states = UserChapterStateService.getForUser(userId, rows.map { it[ChapterTable.id].value })
+    val selected = rows.filter { row ->
+        val state = states[row[ChapterTable.id].value]
+        state != null && (if (latest) state.isRead else state.lastReadAt > 0)
+    }.groupBy { it[ChapterTable.manga].value }.mapValues { (_, chapters) ->
+        chapters.maxWithOrNull(compareBy({ states[it[ChapterTable.id].value]?.lastReadAt ?: 0 }, { it[ChapterTable.sourceOrder] }))
+    }
+    return ids.map { selected[it]?.let(::ChapterType) }
+}
+
 class LastReadChapterForMangaDataLoader : KotlinDataLoader<Int, ChapterType> {
     override val dataLoaderName = "LastReadChapterForMangaDataLoader"
-
     override fun getDataLoader(graphQLContext: GraphQLContext): DataLoader<Int, ChapterType> =
-        DataLoaderFactory.newDataLoader { ids ->
-            future {
-                transaction {
-                    addLogger(Slf4jSqlDebugLogger)
-                    val lastReadChaptersByMangaId =
-                        ChapterTable
-                            .selectAll()
-                            .where { (ChapterTable.manga inList ids) }
-                            .orderBy(ChapterTable.lastReadAt to SortOrder.DESC)
-                            .groupBy { it[ChapterTable.manga].value }
-                    ids.map { id -> lastReadChaptersByMangaId[id]?.let { chapters -> ChapterType(chapters.first()) } }
-                }
-            }
-        }
+        DataLoaderFactory.newDataLoader { ids -> future { userReadChapters(graphQLContext, ids, latest = false) } }
 }
 
 class LatestReadChapterForMangaDataLoader : KotlinDataLoader<Int, ChapterType> {
     override val dataLoaderName = "LatestReadChapterForMangaDataLoader"
+    override fun getDataLoader(graphQLContext: GraphQLContext): DataLoader<Int, ChapterType> =
+        DataLoaderFactory.newDataLoader { ids -> future { userReadChapters(graphQLContext, ids, latest = true) } }
+}
 
+class FirstUnreadChapterForMangaDataLoader : KotlinDataLoader<Int, ChapterType> {
+    override val dataLoaderName = "FirstUnreadChapterForMangaDataLoader"
     override fun getDataLoader(graphQLContext: GraphQLContext): DataLoader<Int, ChapterType> =
         DataLoaderFactory.newDataLoader { ids ->
             future {
-                transaction {
-                    addLogger(Slf4jSqlDebugLogger)
-                    val latestReadChaptersByMangaId =
-                        ChapterTable
-                            .selectAll()
-                            .where { (ChapterTable.manga inList ids) and (ChapterTable.isRead eq true) }
-                            .orderBy(ChapterTable.sourceOrder to SortOrder.DESC)
-                            .groupBy { it[ChapterTable.manga].value }
-                    ids.map { id -> latestReadChaptersByMangaId[id]?.let { chapters -> ChapterType(chapters.first()) } }
-                }
+                val userId = graphQLContext.getAttribute(Attribute.TachideskUser).requireUser()
+                val rows = transaction { ChapterTable.selectAll().where { ChapterTable.manga inList ids }.toList() }
+                val states = UserChapterStateService.getForUser(userId, rows.map { it[ChapterTable.id].value })
+                ids.map { mangaId -> rows.filter { it[ChapterTable.manga].value == mangaId && states[it[ChapterTable.id].value]?.isRead != true }.minByOrNull { it[ChapterTable.sourceOrder] }?.let(::ChapterType) }
             }
         }
 }
@@ -239,26 +230,6 @@ class LatestUploadedChapterForMangaDataLoader : KotlinDataLoader<Int, ChapterTyp
                             .orderBy(ChapterTable.date_upload to SortOrder.DESC, ChapterTable.sourceOrder to SortOrder.DESC)
                             .groupBy { it[ChapterTable.manga].value }
                     ids.map { id -> latestUploadedChaptersByMangaId[id]?.let { chapters -> ChapterType(chapters.first()) } }
-                }
-            }
-        }
-}
-
-class FirstUnreadChapterForMangaDataLoader : KotlinDataLoader<Int, ChapterType> {
-    override val dataLoaderName = "FirstUnreadChapterForMangaDataLoader"
-
-    override fun getDataLoader(graphQLContext: GraphQLContext): DataLoader<Int, ChapterType> =
-        DataLoaderFactory.newDataLoader { ids ->
-            future {
-                transaction {
-                    addLogger(Slf4jSqlDebugLogger)
-                    val firstUnreadChaptersByMangaId =
-                        ChapterTable
-                            .selectAll()
-                            .where { (ChapterTable.manga inList ids) and (ChapterTable.isRead eq false) }
-                            .orderBy(ChapterTable.sourceOrder to SortOrder.ASC)
-                            .groupBy { it[ChapterTable.manga].value }
-                    ids.map { id -> firstUnreadChaptersByMangaId[id]?.let { chapters -> ChapterType(chapters.first()) } }
                 }
             }
         }

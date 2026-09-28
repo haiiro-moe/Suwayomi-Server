@@ -18,7 +18,8 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
 import suwayomi.tachidesk.global.impl.sync.SyncYomiSyncService
-import suwayomi.tachidesk.graphql.directives.RequireAuth
+import suwayomi.tachidesk.graphql.directives.RequirePermission
+import suwayomi.tachidesk.server.user.PermissionNodes
 import suwayomi.tachidesk.graphql.types.CategoryMetaType
 import suwayomi.tachidesk.graphql.types.CategoryType
 import suwayomi.tachidesk.graphql.types.MangaType
@@ -43,7 +44,7 @@ class CategoryMutation {
         val meta: CategoryMetaType,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.LIBRARY_CATEGORY_EDIT)
     fun setCategoryMeta(input: SetCategoryMetaInput): SetCategoryMetaPayload? {
         val (clientMutationId, meta) = input
 
@@ -64,7 +65,7 @@ class CategoryMutation {
         val category: CategoryType,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.LIBRARY_CATEGORY_EDIT)
     fun deleteCategoryMeta(input: DeleteCategoryMetaInput): DeleteCategoryMetaPayload? {
         val (clientMutationId, categoryId, key) = input
 
@@ -109,7 +110,7 @@ class CategoryMutation {
         val categories: List<CategoryType>,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.LIBRARY_CATEGORY_EDIT)
     fun setCategoryMetas(input: SetCategoryMetasInput): SetCategoryMetasPayload? {
         val (clientMutationId, items) = input
 
@@ -164,7 +165,7 @@ class CategoryMutation {
         val categories: List<CategoryType>,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.LIBRARY_CATEGORY_EDIT)
     fun deleteCategoryMetas(input: DeleteCategoryMetasInput): DeleteCategoryMetasPayload? {
         val (clientMutationId, items) = input
 
@@ -288,7 +289,7 @@ class CategoryMutation {
         }
     }
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.LIBRARY_CATEGORY_EDIT)
     fun updateCategory(input: UpdateCategoryInput): UpdateCategoryPayload? {
         val (clientMutationId, id, patch) = input
 
@@ -305,7 +306,7 @@ class CategoryMutation {
         )
     }
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.LIBRARY_CATEGORY_EDIT)
     fun updateCategories(input: UpdateCategoriesInput): UpdateCategoriesPayload? {
         val (clientMutationId, ids, patch) = input
 
@@ -333,7 +334,7 @@ class CategoryMutation {
         val position: Int,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.LIBRARY_CATEGORY_EDIT)
     fun updateCategoryOrder(input: UpdateCategoryOrderInput): UpdateCategoryOrderPayload? {
         val (clientMutationId, categoryId, position) = input
         require(position > 0) {
@@ -368,7 +369,7 @@ class CategoryMutation {
         val category: CategoryType,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.LIBRARY_CATEGORY_CREATE)
     fun createCategory(input: CreateCategoryInput): CreateCategoryPayload? {
         val (clientMutationId, name, order, default, includeInUpdate, includeInDownload) = input
         transaction {
@@ -427,7 +428,7 @@ class CategoryMutation {
         val mangas: List<MangaType>,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.LIBRARY_CATEGORY_DELETE)
     fun deleteCategory(input: DeleteCategoryInput): DeleteCategoryPayload? {
         val (clientMutationId, categoryId) = input
         if (categoryId == 0) { // Don't delete default category
@@ -516,7 +517,7 @@ class CategoryMutation {
         }
     }
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.LIBRARY_CATEGORY_EDIT)
     fun updateMangaCategories(input: UpdateMangaCategoriesInput): UpdateMangaCategoriesPayload? {
         val (clientMutationId, id, patch) = input
 
@@ -533,7 +534,7 @@ class CategoryMutation {
         )
     }
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.LIBRARY_CATEGORY_EDIT)
     fun updateMangasCategories(input: UpdateMangasCategoriesInput): UpdateMangasCategoriesPayload? {
         val (clientMutationId, ids, patch) = input
 

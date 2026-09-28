@@ -12,6 +12,7 @@ import graphql.GraphQLContext
 import org.dataloader.DataLoader
 import org.dataloader.DataLoaderFactory
 import org.jetbrains.exposed.v1.core.Slf4jSqlDebugLogger
+import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.isNull
@@ -23,7 +24,13 @@ import suwayomi.tachidesk.graphql.types.MangaNodeList.Companion.toNodeList
 import suwayomi.tachidesk.graphql.types.MangaType
 import suwayomi.tachidesk.manga.model.table.CategoryMangaTable
 import suwayomi.tachidesk.manga.model.table.MangaTable
+import suwayomi.tachidesk.graphql.server.getAttribute
+import suwayomi.tachidesk.server.JavalinSetup.Attribute
 import suwayomi.tachidesk.server.JavalinSetup.future
+import suwayomi.tachidesk.server.user.CategoryAccessService
+import suwayomi.tachidesk.server.user.PermissionNodes
+import suwayomi.tachidesk.server.user.UserService
+import suwayomi.tachidesk.server.user.requireUser
 
 class MangaDataLoader : KotlinDataLoader<Int, MangaType> {
     override val dataLoaderName = "MangaDataLoader"
@@ -33,10 +40,19 @@ class MangaDataLoader : KotlinDataLoader<Int, MangaType> {
             future {
                 transaction {
                     addLogger(Slf4jSqlDebugLogger)
+                    val userId = graphQLContext.getAttribute(Attribute.TachideskUser).requireUser()
+                    // request-only users may open any manga's page (request view) even though they cannot read it
+                    val openableMangaIds =
+                        if (UserService.hasPermission(userId, PermissionNodes.BROWSE_REQUEST)) {
+                            ids
+                        } else {
+                            CategoryAccessService.readableMangaIds(userId)
+                        }
+                    val visibleMangaIds = openableMangaIds.toSet()
                     val manga =
                         MangaTable
                             .selectAll()
-                            .where { MangaTable.id inList ids }
+                            .where { (MangaTable.id inList ids) and (MangaTable.id inList visibleMangaIds) }
                             .map { MangaType(it) }
                             .associateBy { it.id }
                     ids.map { manga[it] }
@@ -53,12 +69,14 @@ class MangaForCategoryDataLoader : KotlinDataLoader<Int, MangaNodeList> {
             future {
                 transaction {
                     addLogger(Slf4jSqlDebugLogger)
+                    val userId = graphQLContext.getAttribute(Attribute.TachideskUser).requireUser()
+                    val visibleMangaIds = CategoryAccessService.readableMangaIds(userId).toSet()
                     val itemsByRef =
                         if (ids.contains(0)) {
                             MangaTable
                                 .leftJoin(CategoryMangaTable)
                                 .selectAll()
-                                .where { MangaTable.inLibrary eq true }
+                                .where { (MangaTable.inLibrary eq true) and (MangaTable.id inList visibleMangaIds) }
                                 .andWhere { CategoryMangaTable.manga.isNull() }
                                 .map { MangaType(it) }
                                 .let {
@@ -70,7 +88,7 @@ class MangaForCategoryDataLoader : KotlinDataLoader<Int, MangaNodeList> {
                             CategoryMangaTable
                                 .innerJoin(MangaTable)
                                 .selectAll()
-                                .where { CategoryMangaTable.category inList ids }
+                                .where { (CategoryMangaTable.category inList ids) and (CategoryMangaTable.manga inList visibleMangaIds) }
                                 .map { Pair(it[CategoryMangaTable.category].value, MangaType(it)) }
                                 .groupBy { it.first }
                                 .mapValues { it.value.map { pair -> pair.second } }

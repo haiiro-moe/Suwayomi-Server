@@ -45,5 +45,8 @@ dependencies {
     implementation(libs.serialization.json)
     implementation(libs.serialization.protobuf)
     implementation(project(":AndroidCompat"))
+
+    implementation(libs.cron4j)
+    implementation(libs.cronUtils)
 }
 

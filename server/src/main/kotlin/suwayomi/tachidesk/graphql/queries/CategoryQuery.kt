@@ -14,10 +14,15 @@ import org.jetbrains.exposed.v1.core.Column
 import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.greater
+import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.less
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import suwayomi.tachidesk.graphql.directives.RequireAuth
+import suwayomi.tachidesk.graphql.server.getAttribute
+import suwayomi.tachidesk.server.JavalinSetup.Attribute
+import suwayomi.tachidesk.server.user.CategoryAccessService
+import suwayomi.tachidesk.server.user.requireUser
 import suwayomi.tachidesk.graphql.queries.filter.BooleanFilter
 import suwayomi.tachidesk.graphql.queries.filter.Filter
 import suwayomi.tachidesk.graphql.queries.filter.HasGetOp
@@ -124,6 +129,7 @@ class CategoryQuery {
 
     @RequireAuth
     fun categories(
+        dataFetchingEnvironment: DataFetchingEnvironment,
         condition: CategoryCondition? = null,
         filter: CategoryFilter? = null,
         @GraphQLDeprecated(
@@ -143,9 +149,11 @@ class CategoryQuery {
         last: Int? = null,
         offset: Int? = null,
     ): CategoryNodeList {
+        val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
+        val readableCategoryIds = CategoryAccessService.readableCategoryIds(userId)
         val queryResults =
             transaction {
-                val res = CategoryTable.selectAll()
+                val res = CategoryTable.selectAll().where { CategoryTable.id inList readableCategoryIds }
 
                 res.applyOps(condition, filter)
 

@@ -1,4 +1,4 @@
-import de.undercouch.gradle.tasks.download.Download
+import org.gradle.api.tasks.bundling.Zip
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 import java.time.Instant
 
@@ -218,33 +218,63 @@ tasks {
 
     named<Copy>("processResources") {
         duplicatesStrategy = DuplicatesStrategy.INCLUDE
-        mustRunAfter("downloadWebUI")
+        dependsOn("packageWebUI")
     }
 
-    register<Download>("downloadWebUI") {
-        src("https://github.com/Suwayomi/Suwayomi-WebUI-preview/releases/download/$webUIRevisionTag/Suwayomi-WebUI-$webUIRevisionTag.zip")
-        dest("src/main/resources/WebUI.zip")
+    register<Exec>("installWebUI") {
+        group = "webui"
+        description = "Install the pinned WebUI dependencies"
+        workingDir(rootProject.file("WebUI"))
+        commandLine("pnpm", "install", "--frozen-lockfile")
+        inputs.files(rootProject.file("WebUI/package.json"), rootProject.file("WebUI/pnpm-lock.yaml"))
+        outputs.dir(rootProject.file("WebUI/node_modules"))
+    }
 
-        fun shouldOverwrite(): Boolean {
-            val zipPath = project.projectDir.absolutePath + "/src/main/resources/WebUI.zip"
-            val zipFile = net.lingala.zip4j.ZipFile(zipPath)
+    register<Exec>("buildWebUI") {
+        group = "webui"
+        description = "Build the WebUI submodule"
+        dependsOn("installWebUI")
+        workingDir(rootProject.file("WebUI"))
+        commandLine("pnpm", "run", "build")
+        inputs.dir(rootProject.file("WebUI/src"))
+        inputs.dir(rootProject.file("WebUI/public"))
+        inputs.files(
+            rootProject.file("WebUI/package.json"),
+            rootProject.file("WebUI/pnpm-lock.yaml"),
+            rootProject.file("WebUI/vite.config.ts"),
+        )
+        outputs.dir(rootProject.file("WebUI/build"))
+    }
 
-            var shouldOverwrite = true
-            if (zipFile.isValidZipFile) {
-                val zipRevision =
-                    zipFile.getInputStream(zipFile.getFileHeader("revision")).bufferedReader().use {
-                        it.readText().trim()
-                    }
-
-                if (zipRevision == webUIRevisionTag) {
-                    shouldOverwrite = false
-                }
+    register<Zip>("packageWebUI") {
+        group = "webui"
+        description = "Package the built WebUI into the server resources"
+        dependsOn("buildWebUI")
+        val revisionFile = layout.buildDirectory.file("webui-revision")
+        doFirst {
+            val revision =
+                System.getenv("WEBUI_REVISION")
+                    ?: runCatching {
+                        ProcessBuilder("git", "-C", rootProject.file("WebUI").absolutePath, "rev-list", "HEAD", "--count")
+                            .start()
+                            .let { process ->
+                                process.waitFor()
+                                process.inputStream.bufferedReader().use { it.readText().trim() }
+                            }
+                    }.getOrNull()?.takeIf { it.isNotBlank() }?.let { "r$it" }
+                    ?: webUIRevisionTag
+            revisionFile.get().asFile.apply {
+                parentFile.mkdirs()
+                writeText(revision)
             }
-
-            return shouldOverwrite
         }
-
-        overwrite(shouldOverwrite())
+        from(rootProject.file("WebUI/build"))
+        from(revisionFile) {
+            rename { "revision" }
+        }
+        archiveFileName.set("WebUI.zip")
+        destinationDirectory.set(layout.projectDirectory.dir("src/main/resources"))
+        includeEmptyDirs = false
     }
 
     register("runElectron") {

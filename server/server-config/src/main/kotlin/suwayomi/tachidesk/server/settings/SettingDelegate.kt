@@ -228,11 +228,13 @@ class StringSetting(
     description: String? = null,
     excludeFromBackup: Boolean? = null,
     privacySafe: Boolean,
+    customValidator: ((String) -> String?)? = null,
+    customToValidValue: ((String) -> String)? = null,
 ) : SettingDelegate<String>(
         protoNumber = protoNumber,
         defaultValue = defaultValue,
         validator = { value ->
-            when {
+            customValidator?.invoke(value) ?: when {
                 pattern != null && !value.matches(pattern) ->
                     "Value (${maybeRedact(value, privacySafe)}) must match pattern: ${pattern.pattern}"
                 maxLength != null && value.length > maxLength ->
@@ -241,7 +243,7 @@ class StringSetting(
             }
         },
         toValidValue = { value ->
-            if (pattern != null && !value.matches(pattern)) {
+            customToValidValue?.invoke(value) ?: if (pattern != null && !value.matches(pattern)) {
                 defaultValue
             } else {
                 maxLength?.let { value.take(it) } ?: value

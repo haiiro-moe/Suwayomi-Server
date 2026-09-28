@@ -20,7 +20,8 @@ import suwayomi.tachidesk.manga.model.dataclass.SourceDataClass
 import suwayomi.tachidesk.server.JavalinSetup.Attribute
 import suwayomi.tachidesk.server.JavalinSetup.future
 import suwayomi.tachidesk.server.JavalinSetup.getAttribute
-import suwayomi.tachidesk.server.user.requireUser
+import suwayomi.tachidesk.server.user.PermissionNodes
+import suwayomi.tachidesk.server.user.requirePermission
 import suwayomi.tachidesk.server.util.handler
 import suwayomi.tachidesk.server.util.pathParam
 import suwayomi.tachidesk.server.util.queryParam
@@ -40,7 +41,7 @@ object SourceController {
             behaviorOf = { ctx ->
                 ctx.future {
                     future {
-                        ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                        ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.BROWSE_READ)
                         ctx.json(Source.getSourceList())
                     }
                 }
@@ -63,7 +64,7 @@ object SourceController {
             behaviorOf = { ctx, sourceId ->
                 ctx.future {
                     future {
-                        ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                        ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.BROWSE_READ)
                         ctx.json(Source.getSource(sourceId)!!)
                     }
                 }
@@ -86,7 +87,7 @@ object SourceController {
                 }
             },
             behaviorOf = { ctx, sourceId, pageNum ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.BROWSE_READ)
                 ctx.future {
                     future {
                         MangaList.getMangaList(sourceId, pageNum, popular = true)
@@ -110,7 +111,7 @@ object SourceController {
                 }
             },
             behaviorOf = { ctx, sourceId, pageNum ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.BROWSE_READ)
                 ctx.future {
                     future {
                         MangaList.getMangaList(sourceId, pageNum, popular = false)
@@ -135,7 +136,7 @@ object SourceController {
             behaviorOf = { ctx, sourceId ->
                 ctx.future {
                     future {
-                        ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                        ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.BROWSE_READ)
                         ctx.json(Source.getSourcePreferences(sourceId))
                     }
                 }
@@ -157,7 +158,7 @@ object SourceController {
                 body<SourcePreferenceChange>()
             },
             behaviorOf = { ctx, sourceId ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.BROWSE_READ)
                 val preferenceChange = ctx.bodyAsClass(SourcePreferenceChange::class.java)
                 ctx.json(Source.setSourcePreference(sourceId, preferenceChange.position, preferenceChange.value))
             },
@@ -180,7 +181,7 @@ object SourceController {
             behaviorOf = { ctx, sourceId, reset ->
                 ctx.future {
                     future {
-                        ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                        ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.BROWSE_READ)
                         ctx.json(Search.getFilterList(sourceId, reset))
                     }
                 }
@@ -207,7 +208,7 @@ object SourceController {
             behaviorOf = { ctx, sourceId ->
                 ctx.future {
                     future {
-                        ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                        ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.BROWSE_READ)
                         val filterChange =
                             try {
                                 json.decodeFromString<List<FilterChange>>(ctx.body())
@@ -237,7 +238,7 @@ object SourceController {
                 }
             },
             behaviorOf = { ctx, sourceId, searchTerm, pageNum ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.BROWSE_READ)
                 ctx.future {
                     future { Search.sourceSearch(sourceId, searchTerm, pageNum) }
                         .thenApply { ctx.json(it) }
@@ -261,7 +262,7 @@ object SourceController {
                 body<FilterData>()
             },
             behaviorOf = { ctx, sourceId, pageNum ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.BROWSE_READ)
                 val filter = json.decodeFromString<FilterData>(ctx.body())
                 ctx.future {
                     future { Search.sourceFilter(sourceId, pageNum, filter) }
@@ -284,7 +285,7 @@ object SourceController {
                 }
             },
             behaviorOf = { ctx, searchTerm ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.BROWSE_READ)
                 // TODO
                 ctx.json(Search.sourceGlobalSearch(searchTerm))
             },

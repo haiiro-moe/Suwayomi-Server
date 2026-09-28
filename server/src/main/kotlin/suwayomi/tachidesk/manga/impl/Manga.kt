@@ -13,6 +13,7 @@ import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.awaitSuccess
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.local.LocalSource
+import suwayomi.tachidesk.manga.impl.Library
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.model.SMangaUpdate
@@ -189,8 +190,8 @@ object Manga {
         source: Source,
         sManga: SManga,
     ): SManga {
+        val mangaId = mangaEntry[MangaTable.id].value
         suspendTransaction {
-            val mangaId = mangaEntry[MangaTable.id].value
             val currentTitle = mangaEntry[MangaTable.title]
             val remoteTitle =
                 try {
@@ -245,6 +246,13 @@ object Manga {
                 it[MangaTable.updateStrategy] = sManga.update_strategy.name
                 it[MangaTable.memo] = sManga.memo
             }
+        }
+
+        if (mangaEntry[MangaTable.inLibrary] && !sManga.thumbnail_url.isNullOrEmpty() &&
+            mangaEntry[MangaTable.sourceReference] != LocalSource.ID
+        ) {
+            // the persisted library thumbnail is now stale - refresh it in the background so the cover keeps working
+            Library.handleMangaThumbnail(mangaId, true)
         }
 
         return sManga

@@ -9,6 +9,9 @@ package suwayomi.tachidesk.server
 
 import android.app.Application
 import android.content.Context
+import com.cronutils.model.CronType.CRON4J
+import com.cronutils.model.definition.CronDefinitionBuilder
+import com.cronutils.parser.CronParser
 import com.typesafe.config.Config
 import io.github.config4k.toConfig
 import kotlinx.coroutines.CoroutineScope
@@ -63,6 +66,16 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
+
+private val serverCronParser = CronParser(CronDefinitionBuilder.instanceDefinitionFor(CRON4J))
+
+private fun String.validateCronExpression(): String? =
+    try {
+        serverCronParser.parse(this)
+        null
+    } catch (exception: RuntimeException) {
+        "Invalid cron expression: ${exception.message}"
+    }
 
 val mutableConfigValueScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -351,7 +364,30 @@ class ServerConfig(
         privacySafe = true,
         defaultValue = 12.hours.inWholeHours.toDouble(),
         min = 6.0,
-        description = "Time in hours",
+        description = "Legacy interval in hours; use globalUpdateCron for new deployments",
+        deprecated = SettingsRegistry.SettingDeprecated.Migrate.ConfigValue(
+            replaceWith = "globalUpdateCron",
+            message = "Use a cron expression for automated library updates",
+            migrateConfigValue = { value ->
+                val intervalHours = value.unwrapped().toString().toDoubleOrNull() ?: 0.0
+                if (intervalHours <= 0.0) "" else "0 */${intervalHours.toInt().coerceAtLeast(1)} * * *"
+            },
+        ),
+    )
+
+    val globalUpdateCron: MutableStateFlow<String> by StringSetting(
+        protoNumber = 100,
+        group = SettingGroup.LIBRARY_UPDATES,
+        privacySafe = true,
+        defaultValue = "0 */12 * * *",
+        customValidator = { value ->
+            if (value.isBlank()) null else value.validateCronExpression()
+
+        },
+        customToValidValue = { value ->
+            if (value.isBlank()) "" else value
+        },
+        description = "Cron expression for automated whole-library updates; empty disables scheduling",
     )
 
     val updateMangas: MutableStateFlow<Boolean> by BooleanSetting(
@@ -613,6 +649,54 @@ class ServerConfig(
         defaultValue = AuthMode.NONE,
         enumClass = AuthMode::class,
         typeInfo = SettingsRegistry.PartialTypeInfo(imports = listOf("suwayomi.tachidesk.graphql.types.AuthMode")),
+        excludeFromBackup = true,
+    )
+
+    val ssoIssuerUrl: MutableStateFlow<String> by StringSetting(
+        protoNumber = 98,
+        group = SettingGroup.AUTH,
+        privacySafe = true,
+        defaultValue = "",
+        excludeFromBackup = true,
+    )
+
+    val ssoClientId: MutableStateFlow<String> by StringSetting(
+        protoNumber = 99,
+        group = SettingGroup.AUTH,
+        privacySafe = true,
+        defaultValue = "",
+        excludeFromBackup = true,
+    )
+
+    val ssoClientSecret: MutableStateFlow<String> by StringSetting(
+        protoNumber = 101,
+        group = SettingGroup.AUTH,
+        privacySafe = false,
+        defaultValue = "",
+        excludeFromBackup = true,
+    )
+
+    val ssoDefaultRole: MutableStateFlow<String> by StringSetting(
+        protoNumber = 102,
+        group = SettingGroup.AUTH,
+        privacySafe = true,
+        defaultValue = "",
+        excludeFromBackup = true,
+    )
+
+    val ssoScope: MutableStateFlow<String> by StringSetting(
+        protoNumber = 103,
+        group = SettingGroup.AUTH,
+        privacySafe = true,
+        defaultValue = "openid profile email",
+        excludeFromBackup = true,
+    )
+
+    val ssoPublicUrl: MutableStateFlow<String> by StringSetting(
+        protoNumber = 104,
+        group = SettingGroup.AUTH,
+        privacySafe = true,
+        defaultValue = "",
         excludeFromBackup = true,
     )
 

@@ -302,9 +302,10 @@ object CFClearance {
         val solution: FlareSolverSolution,
         val status: String,
         val message: String,
-        val startTimestamp: Long,
-        val endTimestamp: Long,
-        val version: String,
+        // not every FlareSolverr compatible solver (e.g. Byparr) reports these
+        val startTimestamp: Long? = null,
+        val endTimestamp: Long? = null,
+        val version: String? = null,
     )
 
     suspend fun resolveWithFlareSolver(

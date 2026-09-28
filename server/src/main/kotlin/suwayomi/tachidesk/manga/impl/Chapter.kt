@@ -47,6 +47,7 @@ import suwayomi.tachidesk.manga.model.table.MangaTable
 import suwayomi.tachidesk.manga.model.table.PageTable
 import suwayomi.tachidesk.manga.model.table.toDataClass
 import suwayomi.tachidesk.server.serverConfig
+import suwayomi.tachidesk.server.user.UserChapterStateService
 import java.time.Instant
 import java.util.TreeSet
 import kotlin.math.max
@@ -448,6 +449,34 @@ object Chapter {
         return limitedChaptersToDownloadWithDuplicates.map { it.id }
     }
 
+    fun modifyChapterForUser(
+        userId: Int,
+        mangaId: Int,
+        chapterIndex: Int,
+        isRead: Boolean?,
+        isBookmarked: Boolean?,
+        markPrevRead: Boolean?,
+        lastPageRead: Int?,
+    ): Int {
+        val chapterIds =
+            transaction {
+                ChapterTable.select(ChapterTable.id).where {
+                    (ChapterTable.manga eq mangaId) and (ChapterTable.sourceOrder less chapterIndex)
+                }.map { it[ChapterTable.id].value }
+            }
+        val chapterId =
+            transaction {
+                ChapterTable.select(ChapterTable.id).where {
+                    (ChapterTable.manga eq mangaId) and (ChapterTable.sourceOrder eq chapterIndex)
+                }.first()[ChapterTable.id].value
+            }
+        UserChapterStateService.update(userId, chapterId, isRead, isBookmarked, lastPageRead)
+        if (markPrevRead != null) {
+            chapterIds.forEach { id -> UserChapterStateService.update(userId, id, markPrevRead, null, null) }
+        }
+        return chapterId
+    }
+
     fun modifyChapter(
         mangaId: Int,
         chapterIndex: Int,
@@ -774,6 +803,23 @@ object Chapter {
                     }
             }
         }
+
+    fun updateChapterProgressForUser(
+        userId: Int,
+        mangaId: Int,
+        chapterIndex: Int,
+        pageNo: Int,
+    ): Int {
+        val chapterData =
+            transaction {
+                ChapterTable.selectAll().where {
+                    (ChapterTable.sourceOrder eq chapterIndex) and (ChapterTable.manga eq mangaId)
+                }.first().let { ChapterTable.toDataClass(it) }
+            }
+        val isRead = chapterData.pageCount.takeIf { it == pageNo.inc() }?.let { true }
+        UserChapterStateService.update(userId, chapterData.id, isRead, null, pageNo)
+        return chapterData.id
+    }
 
     fun updateChapterProgress(
         mangaId: Int,

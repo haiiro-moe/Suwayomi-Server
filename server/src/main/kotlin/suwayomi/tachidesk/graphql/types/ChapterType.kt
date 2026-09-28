@@ -7,6 +7,7 @@
 
 package suwayomi.tachidesk.graphql.types
 
+import com.expediagroup.graphql.generator.annotations.GraphQLIgnore
 import com.expediagroup.graphql.server.extensions.getValueFromDataLoader
 import graphql.schema.DataFetchingEnvironment
 import org.jetbrains.exposed.v1.core.ResultRow
@@ -17,6 +18,10 @@ import suwayomi.tachidesk.graphql.server.primitives.NodeList
 import suwayomi.tachidesk.graphql.server.primitives.PageInfo
 import suwayomi.tachidesk.manga.model.dataclass.ChapterDataClass
 import suwayomi.tachidesk.manga.model.table.ChapterTable
+import suwayomi.tachidesk.server.JavalinSetup.Attribute
+import suwayomi.tachidesk.server.user.UserChapterStateService
+import suwayomi.tachidesk.server.user.requireUser
+import suwayomi.tachidesk.graphql.server.getAttribute
 import java.util.concurrent.CompletableFuture
 
 data class SyncConflictInfoType(
@@ -97,6 +102,40 @@ class ChapterType(
 
     fun manga(dataFetchingEnvironment: DataFetchingEnvironment): CompletableFuture<MangaType> =
         dataFetchingEnvironment.getValueFromDataLoader<Int, MangaType>("MangaDataLoader", mangaId)
+
+    fun isRead(dataFetchingEnvironment: DataFetchingEnvironment): Boolean =
+        UserChapterStateService.getOrDefault(
+            dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser(),
+            id,
+        ).isRead
+
+    fun isBookmarked(dataFetchingEnvironment: DataFetchingEnvironment): Boolean =
+        UserChapterStateService.getOrDefault(
+            dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser(),
+            id,
+        ).isBookmarked
+
+    fun lastPageRead(dataFetchingEnvironment: DataFetchingEnvironment): Int =
+        UserChapterStateService.getOrDefault(
+            dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser(),
+            id,
+        ).lastPageRead
+
+    fun lastReadAt(dataFetchingEnvironment: DataFetchingEnvironment): Long =
+        UserChapterStateService.getOrDefault(
+            dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser(),
+            id,
+        ).lastReadAt
+
+    @GraphQLIgnore
+    fun withUserState(state: suwayomi.tachidesk.server.user.UserChapterState?): ChapterType {
+        if (state == null) return this
+        return ChapterType(
+            id, url, name, uploadDate, chapterNumber, scanlator, mangaId,
+            state.isRead, state.isBookmarked, state.lastPageRead, state.lastReadAt,
+            sourceOrder, realUrl, fetchedAt, isDownloaded, pageCount,
+        )
+    }
 
     fun meta(dataFetchingEnvironment: DataFetchingEnvironment): CompletableFuture<List<ChapterMetaType>> =
         dataFetchingEnvironment.getValueFromDataLoader<Int, List<ChapterMetaType>>("ChapterMetaDataLoader", id)

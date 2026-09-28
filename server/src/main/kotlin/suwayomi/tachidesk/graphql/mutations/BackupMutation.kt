@@ -6,7 +6,7 @@ import com.expediagroup.graphql.generator.annotations.GraphQLDeprecated
 import io.javalin.http.UploadedFile
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeout
-import suwayomi.tachidesk.graphql.directives.RequireAuth
+import suwayomi.tachidesk.graphql.directives.RequirePermission
 import suwayomi.tachidesk.graphql.server.TemporaryFileStorage
 import suwayomi.tachidesk.graphql.types.BackupRestoreStatus
 import suwayomi.tachidesk.graphql.types.PartialBackupFlags
@@ -32,7 +32,7 @@ class BackupMutation {
         val status: BackupRestoreStatus?,
     )
 
-    @RequireAuth
+    @RequirePermission("settings.backup")
     fun restoreBackup(input: RestoreBackupInput): CompletableFuture<RestoreBackupPayload> {
         val (clientMutationId, backup, flags) = input
 
@@ -75,7 +75,7 @@ class BackupMutation {
         val url: String,
     )
 
-    @RequireAuth
+    @RequirePermission("settings.backup")
     fun createBackup(input: CreateBackupInput? = null): CreateBackupPayload {
         val filename = Backup.getFilename()
 
