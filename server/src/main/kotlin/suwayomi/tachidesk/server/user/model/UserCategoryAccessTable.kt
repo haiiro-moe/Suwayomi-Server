@@ -15,3 +15,14 @@ object UserCategoryAccessTable : IntIdTable("user_category_access") {
 		index(false, user, canRead)
 	}
 }
+
+object RoleCategoryAccessTable : IntIdTable("role_category_access") {
+	val role = reference("role_id", RoleTable, onDelete = ReferenceOption.CASCADE)
+	val category = reference("category_id", CategoryTable, onDelete = ReferenceOption.CASCADE)
+	val canRead = bool("can_read").default(false)
+	val canEdit = bool("can_edit").default(false)
+
+	init {
+		uniqueIndex(role, category)
+	}
+}
