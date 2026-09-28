@@ -253,9 +253,19 @@ object JavalinSetup {
                 throw RedirectResponse(HttpStatus.SEE_OTHER)
             }
 
+            // Hand both tokens to the WebUI via the URL fragment (never sent to the server or logged), so it can
+            // store the refresh token and keep the session alive like a password login. A plain access token
+            // cookie would silently expire after jwtTokenExpiry without any way to refresh it.
             val jwt = Jwt.generateJwt(userId)
-            ctx.cookie("suwayomi-server-token", jwt.accessToken, Int.MAX_VALUE)
-            ctx.header("Location", ServerSubpath.maybeAddAsPrefix("/"))
+            ctx.removeCookie("suwayomi-server-token", "/")
+            val fragment =
+                mapOf(
+                    "ssoAccessToken" to jwt.accessToken,
+                    "ssoRefreshToken" to jwt.refreshToken,
+                ).entries.joinToString("&") { (key, value) ->
+                    "$key=${URLEncoder.encode(value, Charsets.UTF_8)}"
+                }
+            ctx.header("Location", "${ServerSubpath.maybeAddAsPrefix("/")}#$fragment")
             throw RedirectResponse(HttpStatus.SEE_OTHER)
         }
 
