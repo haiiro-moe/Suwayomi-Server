@@ -122,6 +122,30 @@ if [ "$AUTH_MODE" = "SSO" ]; then
     SSO_SCOPE="$(prompt "OIDC scopes" "${SUWAIRO_SSO_SCOPE:-openid profile email}")"
 fi
 
+# ── vpn ──────────────────────────────────────────────────────────────────────
+step "VPN"
+hint "Optionally route outbound traffic (sources, FlareSolverr) through Mullvad over WireGuard,"
+hint "e.g. when Cloudflare blocks this server's IP. Generate a WireGuard key and download a Linux"
+hint "config at https://mullvad.net/en/account/wireguard-config, then copy PrivateKey and Address."
+VPN_DEFAULT="n"
+if [ -n "${MULLVAD_WIREGUARD_PRIVATE_KEY:-}" ]; then VPN_DEFAULT="y"; fi
+USE_VPN="$(prompt "Use Mullvad VPN? [y/n]" "$VPN_DEFAULT")"
+WG_PRIVATE_KEY='' WG_ADDRESSES='' VPN_COUNTRIES='' VPN_CITIES=''
+if [[ "$USE_VPN" == "y" || "$USE_VPN" == "Y" ]]; then
+    USE_VPN="y"
+    while [ -z "$WG_PRIVATE_KEY" ]; do
+        WG_PRIVATE_KEY="$(prompt_secret "WireGuard private key" "${MULLVAD_WIREGUARD_PRIVATE_KEY:-}")"
+        [ -n "$WG_PRIVATE_KEY" ] || warn "The private key is required"
+    done
+    while [ -z "$WG_ADDRESSES" ]; do
+        WG_ADDRESSES="$(prompt "WireGuard address (e.g. 10.64.12.34/32)" "${MULLVAD_WIREGUARD_ADDRESSES:-}")"
+    done
+    VPN_COUNTRIES="$(prompt "Server countries (comma separated, blank = any)" "${MULLVAD_SERVER_COUNTRIES:-}")"
+    VPN_CITIES="$(prompt "Server cities (comma separated, blank = any)" "${MULLVAD_SERVER_CITIES:-}")"
+else
+    USE_VPN="n"
+fi
+
 # ── write .env ───────────────────────────────────────────────────────────────
 step "Writing .env"
 {
@@ -134,6 +158,12 @@ step "Writing .env"
     if [ -n "$SSO_CLIENT_SECRET" ];   then echo "SUWAIRO_SSO_CLIENT_SECRET=$SSO_CLIENT_SECRET"; fi
     if [ -n "$SSO_DEFAULT_ROLE" ];    then echo "SUWAIRO_SSO_DEFAULT_ROLE=$SSO_DEFAULT_ROLE"; fi
     if [ -n "$SSO_SCOPE" ];           then echo "SUWAIRO_SSO_SCOPE=$SSO_SCOPE"; fi
+    if [ "$USE_VPN" = "y" ]; then
+        echo "MULLVAD_WIREGUARD_PRIVATE_KEY=$WG_PRIVATE_KEY"
+        echo "MULLVAD_WIREGUARD_ADDRESSES=$WG_ADDRESSES"
+        if [ -n "$VPN_COUNTRIES" ]; then echo "MULLVAD_SERVER_COUNTRIES=$VPN_COUNTRIES"; fi
+        if [ -n "$VPN_CITIES" ];    then echo "MULLVAD_SERVER_CITIES=$VPN_CITIES"; fi
+    fi
 } > .env
 chmod 600 .env
 ok ".env written (permissions 600)"
@@ -143,25 +173,31 @@ if [ "$AUTH_MODE" = "SSO" ]; then
     # compose.sso.yml has the SSO environment wired up and reads overrides from .env
     COMPOSE_FILE="compose.sso.yml"
 fi
+COMPOSE_ARGS=(-f "$COMPOSE_FILE")
+if [ "$USE_VPN" = "y" ]; then
+    # routes the server and FlareSolverr through Mullvad
+    COMPOSE_ARGS+=(-f compose.vpn.yml)
+    COMPOSE_FILE="$COMPOSE_FILE + compose.vpn.yml"
+fi
 info "Using compose file: $COMPOSE_FILE"
 
 # ── build ────────────────────────────────────────────────────────────────────
 step "Building production image"
 hint "First build compiles the Kotlin server and the WebUI - this can take several minutes."
-docker compose -f "$COMPOSE_FILE" build
+docker compose "${COMPOSE_ARGS[@]}" build
 
 # ── start ────────────────────────────────────────────────────────────────────
 step "Starting containers"
-docker compose -f "$COMPOSE_FILE" up -d
+docker compose "${COMPOSE_ARGS[@]}" up -d
 
 # ── health ───────────────────────────────────────────────────────────────────
 step "Waiting for the server to become healthy"
 hint "The health check runs wget against the server's HTTP endpoint."
 ATTEMPTS=0
-until docker compose -f "$COMPOSE_FILE" ps --format '{{.Health}}' 2>/dev/null | grep -q healthy; do
+until docker compose "${COMPOSE_ARGS[@]}" ps server --format '{{.Health}}' 2>/dev/null | grep -q healthy; do
     ATTEMPTS=$((ATTEMPTS + 1))
     if [ "$ATTEMPTS" -ge 36 ]; then
-        docker compose -f "$COMPOSE_FILE" logs --tail 40 server
+        docker compose "${COMPOSE_ARGS[@]}" logs --tail 40 server
         die "Server did not become healthy within 3 minutes - recent logs shown above"
     fi
     printf '.'
@@ -192,6 +228,9 @@ step "Deployment summary"
 info "URL:        http://<server-address>:${PORT}"
 info "Auth mode:  $AUTH_MODE"
 info "Compose:    $COMPOSE_FILE (.env holds the values)"
+if [ "$USE_VPN" = "y" ]; then
+    info "VPN:        outbound traffic goes through Mullvad (check: docker compose ${COMPOSE_ARGS[*]} logs vpn)"
+fi
 if [ "$AUTH_MODE" = "UI_LOGIN" ]; then
     info "First run:  open the URL and create the owner account (username + password of your choice)."
 else
@@ -219,5 +258,5 @@ printf '\n%sSecrets are stored in .env (mode 600). Keep a copy in your password 
 printf '\n'
 read -r -p "$(printf '%sFollow server logs?%s [Y/n] ' "$BOLD" "$RESET")" follow
 if [[ "${follow:-y}" != "n" && "${follow:-y}" != "N" ]]; then
-    docker compose -f "$COMPOSE_FILE" logs -f server
+    docker compose "${COMPOSE_ARGS[@]}" logs -f server
 fi

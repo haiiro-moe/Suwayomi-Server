@@ -74,6 +74,19 @@ The server listens on port 4567. First run: create the owner account in the UI.
 3. Start:
        docker compose -f compose.sso.yml up -d --build
 
+## Mullvad VPN (optional)
+Routes the server and FlareSolverr through a Mullvad WireGuard tunnel, e.g. when
+Cloudflare blocks the host's IP.
+1. Generate a WireGuard key at https://mullvad.net/en/account/wireguard-config,
+   download a Linux config, and put its PrivateKey and Address into .env:
+       MULLVAD_WIREGUARD_PRIVATE_KEY=...
+       MULLVAD_WIREGUARD_ADDRESSES=10.x.x.x/32
+       MULLVAD_SERVER_COUNTRIES=Netherlands
+2. Start with the overlay on top of the compose file you use:
+       docker compose -f compose.sso.yml -f compose.vpn.yml up -d --build
+3. The port is published by the `vpn` container; a reverse proxy on a docker
+   network must target `vpn:4567` instead of `server:4567`.
+
 ## Notes
 - Data is persisted in the `suwairo-data` volume.
 - Branding assets (if included) are mounted read-only from ./branding.
