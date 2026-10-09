@@ -86,6 +86,9 @@ Cloudflare blocks the host's IP.
        docker compose -f compose.sso.yml -f compose.vpn.yml up -d --build
 3. The port is published by the `vpn` container; a reverse proxy on a docker
    network must target `vpn:4567` instead of `server:4567`.
+4. Host overrides (extra_hosts) must be set on the `vpn` service, and LAN
+   addresses they point to allowed via VPN_OUTBOUND_SUBNETS in .env
+   (e.g. VPN_OUTBOUND_SUBNETS=10.0.0.101/32).
 
 ## Notes
 - Data is persisted in the `suwairo-data` volume.

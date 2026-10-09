@@ -16,6 +16,16 @@
 # The server and FlareSolverr share the VPN container's network, so the web UI port is published on the vpn service
 # and anything that previously reached the server as `server:4567` (e.g. a reverse proxy on a docker network) has to
 # use `vpn:4567` instead. Both containers egress from the same Mullvad IP, which Cloudflare clearance cookies require.
+#
+# Docker rejects extra_hosts on a container that uses another container's network, so host overrides (e.g. pointing
+# the OIDC issuer at its LAN address) belong on the vpn service, and the address must be allowed past the tunnel:
+#
+#   services:
+#       vpn:
+#           extra_hosts:
+#               - "auth.example.com:10.0.0.101"
+#
+#   VPN_OUTBOUND_SUBNETS=10.0.0.101/32   (in .env)
 
 services:
     vpn:
@@ -51,6 +61,8 @@ services:
     server:
         network_mode: service:vpn
         ports: !reset []
+        # set these on the vpn service instead, see above
+        extra_hosts: !reset []
         environment:
             FLARESOLVERR_ENABLED: true
             # same network namespace as the solver
