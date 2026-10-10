@@ -33,8 +33,9 @@ RUN --mount=type=cache,id=suwairo-gradle-cache,target=/root/.gradle \
 
 FROM eclipse-temurin:25-jre
 
+# webp, libjpeg-turbo-progs and optipng provide cwebp, jpegtran and optipng for the chapter optimizer
 RUN apt-get update \
-    && apt-get install --no-install-recommends --yes ca-certificates wget \
+    && apt-get install --no-install-recommends --yes ca-certificates wget webp libjpeg-turbo-progs optipng \
     && rm -rf /var/lib/apt/lists/*
 
 ENV HOME=/data \

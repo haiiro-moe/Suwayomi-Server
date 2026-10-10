@@ -34,6 +34,7 @@ import suwayomi.tachidesk.graphql.mutations.InfoMutation
 import suwayomi.tachidesk.graphql.mutations.KoreaderSyncMutation
 import suwayomi.tachidesk.graphql.mutations.MangaMutation
 import suwayomi.tachidesk.graphql.mutations.MetaMutation
+import suwayomi.tachidesk.graphql.mutations.OptimizationMutation
 import suwayomi.tachidesk.graphql.mutations.SettingsMutation
 import suwayomi.tachidesk.graphql.mutations.RequestMutation
 import suwayomi.tachidesk.graphql.mutations.SourceMutation
@@ -60,6 +61,7 @@ import suwayomi.tachidesk.graphql.queries.InfoQuery
 import suwayomi.tachidesk.graphql.queries.KoreaderSyncQuery
 import suwayomi.tachidesk.graphql.queries.MangaQuery
 import suwayomi.tachidesk.graphql.queries.MetaQuery
+import suwayomi.tachidesk.graphql.queries.OptimizationQuery
 import suwayomi.tachidesk.graphql.queries.SettingsQuery
 import suwayomi.tachidesk.graphql.queries.SourceQuery
 import suwayomi.tachidesk.graphql.queries.SyncQuery
@@ -72,6 +74,7 @@ import suwayomi.tachidesk.graphql.server.primitives.GraphQLLongAsString
 import suwayomi.tachidesk.graphql.server.primitives.GraphQLUpload
 import suwayomi.tachidesk.graphql.subscriptions.DownloadSubscription
 import suwayomi.tachidesk.graphql.subscriptions.InfoSubscription
+import suwayomi.tachidesk.graphql.subscriptions.OptimizationSubscription
 import suwayomi.tachidesk.graphql.subscriptions.SyncSubscription
 import suwayomi.tachidesk.graphql.subscriptions.UpdateSubscription
 import suwayomi.tachidesk.graphql.subscriptions.UserSubscription
@@ -123,6 +126,7 @@ object GraphQLSchemaProvider {
                         TopLevelObject(CategoryAccessQuery()),
                         TopLevelObject(ChapterQuery()),
                         TopLevelObject(DownloadQuery()),
+                        TopLevelObject(OptimizationQuery()),
                         TopLevelObject(ExtensionQuery()),
                         TopLevelObject(ExtensionStoreQuery()),
                         TopLevelObject(InfoQuery()),
@@ -149,6 +153,7 @@ object GraphQLSchemaProvider {
                         TopLevelObject(CategoryMutation()),
                         TopLevelObject(ChapterMutation()),
                         TopLevelObject(DownloadMutation()),
+                        TopLevelObject(OptimizationMutation()),
                         TopLevelObject(ExtensionMutation()),
                         TopLevelObject(ExtensionStoreMutation()),
                         TopLevelObject(ImageMutation()),
@@ -169,6 +174,7 @@ object GraphQLSchemaProvider {
                 subscriptions =
                     listOf(
                         TopLevelObject(DownloadSubscription()),
+                        TopLevelObject(OptimizationSubscription()),
                         TopLevelObject(InfoSubscription()),
                         TopLevelObject(SyncSubscription()),
                         TopLevelObject(UpdateSubscription()),

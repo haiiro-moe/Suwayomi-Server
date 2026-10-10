@@ -35,6 +35,7 @@ import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
 import suwayomi.tachidesk.manga.impl.download.DownloadManager
 import suwayomi.tachidesk.manga.impl.download.DownloadManager.EnqueueInput
+import suwayomi.tachidesk.manga.impl.optimize.OptimizationManager
 import suwayomi.tachidesk.manga.impl.track.Track
 import suwayomi.tachidesk.manga.impl.util.updateChapterDownloadDir
 import suwayomi.tachidesk.manga.model.dataclass.ChapterDataClass
@@ -239,6 +240,7 @@ object Chapter {
             // we got some clean up due
             if (chaptersIdsToDelete.isNotEmpty()) {
                 DownloadManager.dequeue(chaptersIdsToDelete)
+                OptimizationManager.dequeue(chaptersIdsToDelete)
                 PageTable.deleteWhere { chapter inList chaptersIdsToDelete }
                 ChapterTable.deleteWhere { id inList chaptersIdsToDelete }
             }
@@ -298,6 +300,7 @@ object Chapter {
 
                                 this[ChapterTable.isDownloaded] = true
                                 this[ChapterTable.pageCount] = deletedDownloadedChapterByChapterNumber[it.chapterNumber]!!.pageCount
+                                this[ChapterTable.isOptimized] = deletedDownloadedChapterByChapterNumber[it.chapterNumber]!!.optimized
                             }
                         }.toExecutable()
                         .execute(this@suspendTransaction)

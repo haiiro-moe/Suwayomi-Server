@@ -28,6 +28,7 @@ import suwayomi.tachidesk.graphql.types.SyncConflictInfoType
 import suwayomi.tachidesk.manga.impl.Chapter
 import suwayomi.tachidesk.manga.impl.Manga
 import suwayomi.tachidesk.manga.impl.chapter.getChapterDownloadReadyById
+import suwayomi.tachidesk.manga.impl.optimize.OptimizationManager
 import suwayomi.tachidesk.manga.impl.sync.KoreaderSyncService
 import suwayomi.tachidesk.manga.model.table.ChapterMetaTable
 import suwayomi.tachidesk.manga.model.table.ChapterTable
@@ -419,6 +420,8 @@ class ChapterMutation {
         val paramsMap = input.toParams()
 
         return future {
+            OptimizationManager.ensureAccessible(chapterId)
+
             var chapter = getChapterDownloadReadyById(chapterId)
             val syncResult = KoreaderSyncService.checkAndPullProgress(chapter.id)
             var syncConflictInfo: SyncConflictInfoType? = null

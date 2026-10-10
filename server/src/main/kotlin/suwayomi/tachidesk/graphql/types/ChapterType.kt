@@ -46,6 +46,7 @@ class ChapterType(
     val fetchedAt: Long,
     val isDownloaded: Boolean,
     val pageCount: Int,
+    val isOptimized: Boolean = false,
 //    val chapterCount: Int?,
 ) : Node {
     companion object {
@@ -78,6 +79,7 @@ class ChapterType(
         row[ChapterTable.fetchedAt],
         row[ChapterTable.isDownloaded],
         row[ChapterTable.pageCount],
+        row[ChapterTable.isOptimized],
 //        transaction { ChapterTable.selectAll().where { Manga eq chapterEntry[manga].value }.count().toInt() },
     )
 
@@ -98,6 +100,7 @@ class ChapterType(
         dataClass.fetchedAt,
         dataClass.downloaded,
         dataClass.pageCount,
+        dataClass.optimized,
     )
 
     fun manga(dataFetchingEnvironment: DataFetchingEnvironment): CompletableFuture<MangaType> =
@@ -133,7 +136,7 @@ class ChapterType(
         return ChapterType(
             id, url, name, uploadDate, chapterNumber, scanlator, mangaId,
             state.isRead, state.isBookmarked, state.lastPageRead, state.lastReadAt,
-            sourceOrder, realUrl, fetchedAt, isDownloaded, pageCount,
+            sourceOrder, realUrl, fetchedAt, isDownloaded, pageCount, isOptimized,
         )
     }
 

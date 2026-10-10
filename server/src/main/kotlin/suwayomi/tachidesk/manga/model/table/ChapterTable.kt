@@ -34,6 +34,9 @@ object ChapterTable : IntIdTable() {
 
     val isDownloaded = bool("is_downloaded").default(false)
 
+    /** the downloaded files went through the optimizer, see [suwayomi.tachidesk.manga.impl.optimize.OptimizationManager] */
+    val isOptimized = bool("is_optimized").default(false)
+
     val pageCount = integer("page_count").default(-1)
 
     val manga = reference("manga", MangaTable, ReferenceOption.CASCADE)
@@ -64,6 +67,7 @@ fun ChapterTable.toDataClass(chapterEntry: ResultRow) =
         fetchedAt = chapterEntry[fetchedAt],
         realUrl = chapterEntry[realUrl],
         downloaded = chapterEntry[isDownloaded],
+        optimized = chapterEntry[isOptimized],
         pageCount = chapterEntry[pageCount],
         lastModifiedAt = chapterEntry[lastModifiedAt],
         version = chapterEntry[version],

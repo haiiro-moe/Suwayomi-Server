@@ -22,6 +22,7 @@ import suwayomi.tachidesk.manga.impl.Library
 import suwayomi.tachidesk.manga.impl.Manga
 import suwayomi.tachidesk.manga.impl.Page
 import suwayomi.tachidesk.manga.impl.chapter.getChapterDownloadReadyByIndex
+import suwayomi.tachidesk.manga.impl.optimize.OptimizationManager
 import suwayomi.tachidesk.manga.impl.sync.KoreaderSyncService
 import suwayomi.tachidesk.manga.model.dataclass.CategoryDataClass
 import suwayomi.tachidesk.manga.model.dataclass.ChapterDataClass
@@ -361,6 +362,7 @@ object MangaController {
                 ctx.future {
                     future {
                         var chapter = getChapterDownloadReadyByIndex(chapterIndex, mangaId)
+                        OptimizationManager.ensureAccessible(chapter.id)
                         val syncResult = KoreaderSyncService.checkAndPullProgress(chapter.id)
 
                         if (syncResult != null) {

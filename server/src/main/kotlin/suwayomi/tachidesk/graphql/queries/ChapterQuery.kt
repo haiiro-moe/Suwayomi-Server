@@ -129,6 +129,7 @@ class ChapterQuery {
         val fetchedAt: Long? = null,
         val isDownloaded: Boolean? = null,
         val pageCount: Int? = null,
+        val isOptimized: Boolean? = null,
     ) : HasGetOp {
         override fun getOp(): Op<Boolean>? {
             val opAnd = OpAnd()
@@ -148,6 +149,7 @@ class ChapterQuery {
             opAnd.eq(fetchedAt, ChapterTable.fetchedAt)
             opAnd.eq(isDownloaded, ChapterTable.isDownloaded)
             opAnd.eq(pageCount, ChapterTable.pageCount)
+            opAnd.eq(isOptimized, ChapterTable.isOptimized)
 
             return opAnd.op
         }
@@ -170,6 +172,7 @@ class ChapterQuery {
         val fetchedAt: LongFilter? = null,
         val isDownloaded: BooleanFilter? = null,
         val pageCount: IntFilter? = null,
+        val isOptimized: BooleanFilter? = null,
         val inLibrary: BooleanFilter? = null,
         override val and: List<ChapterFilter>? = null,
         override val or: List<ChapterFilter>? = null,
@@ -193,6 +196,7 @@ class ChapterQuery {
                 andFilterWithCompare(ChapterTable.fetchedAt, fetchedAt),
                 andFilterWithCompare(ChapterTable.isDownloaded, isDownloaded),
                 andFilterWithCompare(ChapterTable.pageCount, pageCount),
+                andFilterWithCompare(ChapterTable.isOptimized, isOptimized),
             )
 
         fun getLibraryOp() = andFilterWithCompare(MangaTable.inLibrary, inLibrary)

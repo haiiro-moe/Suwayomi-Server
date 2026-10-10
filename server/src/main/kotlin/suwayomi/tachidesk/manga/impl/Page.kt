@@ -20,6 +20,7 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
 import suwayomi.tachidesk.graphql.types.DownloadConversion
+import suwayomi.tachidesk.manga.impl.optimize.OptimizationManager
 import suwayomi.tachidesk.manga.impl.util.getChapterCachePath
 import suwayomi.tachidesk.manga.impl.util.source.GetSource.getSourceOrNull
 import suwayomi.tachidesk.manga.impl.util.storage.ImageResponse.getImageResponse
@@ -61,6 +62,7 @@ object Page {
         chapterIndex: Int? = null,
         index: Int,
         progressFlow: ((StateFlow<Int>) -> Unit)? = null,
+        ignoreOptimizationLock: Boolean = false,
     ): Pair<InputStream, String> {
         val mangaEntry = transaction { MangaTable.selectAll().where { MangaTable.id eq mangaId }.first() }
         val chapterEntry =
@@ -78,6 +80,10 @@ object Page {
                 }
             }
         val chapterId = chapterEntry[ChapterTable.id].value
+
+        if (!ignoreOptimizationLock) {
+            OptimizationManager.ensureAccessible(chapterId)
+        }
 
         try {
             if (chapterEntry[ChapterTable.isDownloaded]) {
@@ -191,6 +197,8 @@ object Page {
                 chapterId = chapterId,
                 index = index,
                 progressFlow = progressFlow,
+                // the downloader fetches the pages before the chapter gets queued for optimization
+                ignoreOptimizationLock = true,
             )
         val conversions = serverConfig.downloadConversions.value
         if (conversions.isEmpty() || !downloadCacheFolder.exists()) {
