@@ -18,6 +18,8 @@ object PermissionNodes {
     const val UPDATES_READ = "updates.read"
     const val UPDATES_TRIGGER = "updates.trigger"
     const val UPDATES_MANAGE_CRON = "updates.manage_cron"
+    const val OPTIMIZATIONS_READ = "optimizations.read"
+    const val OPTIMIZATIONS_MANAGE = "optimizations.manage"
     const val SETTINGS_EDIT = "settings.edit"
     const val ADMIN_USERS_MANAGE = "admin.users.manage"
     const val ADMIN_ROLES_MANAGE = "admin.roles.manage"
@@ -58,6 +60,8 @@ object PermissionNodes {
         UPDATES_READ,
         UPDATES_TRIGGER,
         UPDATES_MANAGE_CRON,
+        OPTIMIZATIONS_READ,
+        OPTIMIZATIONS_MANAGE,
         SETTINGS_EDIT,
         ADMIN_USERS_MANAGE,
         ADMIN_ROLES_MANAGE,

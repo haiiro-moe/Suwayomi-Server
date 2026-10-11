@@ -2,11 +2,12 @@
 
 package suwayomi.tachidesk.graphql.mutations
 
-import suwayomi.tachidesk.graphql.directives.RequireAuth
+import suwayomi.tachidesk.graphql.directives.RequirePermission
 import suwayomi.tachidesk.graphql.types.ChapterOptimizationReorder
 import suwayomi.tachidesk.graphql.types.OptimizationStatus
 import suwayomi.tachidesk.manga.impl.optimize.OptimizationManager
 import suwayomi.tachidesk.server.JavalinSetup.future
+import suwayomi.tachidesk.server.user.PermissionNodes
 import java.util.concurrent.CompletableFuture
 
 class OptimizationMutation {
@@ -23,7 +24,7 @@ class OptimizationMutation {
         val ids: List<Int>,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.OPTIMIZATIONS_MANAGE)
     fun enqueueChapterOptimizations(input: EnqueueChapterOptimizationsInput): CompletableFuture<OptimizationStatusPayload> =
         future {
             OptimizationManager.enqueue(input.ids)
@@ -35,7 +36,7 @@ class OptimizationMutation {
         val ids: List<Int>,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.OPTIMIZATIONS_MANAGE)
     fun dequeueChapterOptimizations(input: DequeueChapterOptimizationsInput): CompletableFuture<OptimizationStatusPayload> =
         future {
             OptimizationManager.dequeue(input.ids)
@@ -47,7 +48,7 @@ class OptimizationMutation {
         val reorders: List<ChapterOptimizationReorder>,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.OPTIMIZATIONS_MANAGE)
     fun reorderChapterOptimizations(input: ReorderChapterOptimizationsInput): CompletableFuture<OptimizationStatusPayload> =
         future {
             input.reorders.forEach { OptimizationManager.reorder(it.chapterId, it.to) }
@@ -58,7 +59,7 @@ class OptimizationMutation {
         val clientMutationId: String? = null,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.OPTIMIZATIONS_MANAGE)
     fun startOptimizer(input: StartOptimizerInput): CompletableFuture<OptimizationStatusPayload> =
         future {
             OptimizationManager.start()
@@ -69,7 +70,7 @@ class OptimizationMutation {
         val clientMutationId: String? = null,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.OPTIMIZATIONS_MANAGE)
     fun stopOptimizer(input: StopOptimizerInput): CompletableFuture<OptimizationStatusPayload> =
         future {
             OptimizationManager.stop()
@@ -80,7 +81,7 @@ class OptimizationMutation {
         val clientMutationId: String? = null,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.OPTIMIZATIONS_MANAGE)
     fun clearOptimizer(input: ClearOptimizerInput): CompletableFuture<OptimizationStatusPayload> =
         future {
             OptimizationManager.clear()

@@ -9,11 +9,12 @@ package suwayomi.tachidesk.graphql.subscriptions
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import suwayomi.tachidesk.graphql.directives.RequireAuth
+import suwayomi.tachidesk.graphql.directives.RequirePermission
 import suwayomi.tachidesk.graphql.types.OptimizationUpdates
 import suwayomi.tachidesk.manga.impl.optimize.OptimizationManager
+import suwayomi.tachidesk.server.user.PermissionNodes
 
 class OptimizationSubscription {
-    @RequireAuth
+    @RequirePermission(PermissionNodes.OPTIMIZATIONS_READ)
     fun optimizationStatusChanged(): Flow<OptimizationUpdates> = OptimizationManager.updates.map { OptimizationUpdates(it) }
 }
