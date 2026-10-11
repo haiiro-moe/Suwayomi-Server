@@ -22,6 +22,7 @@ import suwayomi.tachidesk.manga.impl.Library
 import suwayomi.tachidesk.manga.impl.Manga
 import suwayomi.tachidesk.manga.impl.Page
 import suwayomi.tachidesk.manga.impl.chapter.getChapterDownloadReadyByIndex
+import suwayomi.tachidesk.manga.impl.optimize.OptimizationManager
 import suwayomi.tachidesk.manga.impl.sync.KoreaderSyncService
 import suwayomi.tachidesk.manga.model.dataclass.CategoryDataClass
 import suwayomi.tachidesk.manga.model.dataclass.ChapterDataClass
@@ -31,6 +32,10 @@ import suwayomi.tachidesk.server.JavalinSetup.Attribute
 import suwayomi.tachidesk.server.JavalinSetup.future
 import suwayomi.tachidesk.server.JavalinSetup.getAttribute
 import suwayomi.tachidesk.server.serverConfig
+import suwayomi.tachidesk.server.user.ForbiddenException
+import suwayomi.tachidesk.server.user.PermissionNodes
+import suwayomi.tachidesk.server.user.UserService
+import suwayomi.tachidesk.server.user.requirePermission
 import suwayomi.tachidesk.server.user.requireUser
 import suwayomi.tachidesk.server.user.requireUserWithBasicFallback
 import suwayomi.tachidesk.server.util.formParam
@@ -55,7 +60,7 @@ object MangaController {
                 }
             },
             behaviorOf = { ctx, mangaId, onlineFetch ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_READ)
                 ctx.future {
                     future {
                         Manga.getManga(mangaId, onlineFetch)
@@ -80,7 +85,7 @@ object MangaController {
                 }
             },
             behaviorOf = { ctx, mangaId, onlineFetch ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_READ)
                 ctx.future {
                     future {
                         Manga.getMangaFull(mangaId, onlineFetch)
@@ -104,7 +109,14 @@ object MangaController {
                 }
             },
             behaviorOf = { ctx, mangaId ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                val user = ctx.getAttribute(Attribute.TachideskUser)
+                val userId = user.requireUser()
+                // users who may only request manga still need covers for the request preview
+                if (!UserService.hasPermission(userId, PermissionNodes.LIBRARY_READ) &&
+                    !UserService.hasPermission(userId, PermissionNodes.BROWSE_REQUEST)
+                ) {
+                    throw ForbiddenException()
+                }
                 ctx.future {
                     future { Manga.getMangaThumbnail(mangaId) }
                         .thenApply {
@@ -132,7 +144,7 @@ object MangaController {
                 }
             },
             behaviorOf = { ctx, mangaId ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.BROWSE_ADD_TO_LIBRARY)
                 ctx.future {
                     future { Library.addMangaToLibrary(mangaId) }
                         .thenApply { ctx.status(HttpStatus.OK) }
@@ -155,7 +167,7 @@ object MangaController {
                 }
             },
             behaviorOf = { ctx, mangaId ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.BROWSE_ADD_TO_LIBRARY)
                 ctx.future {
                     future { Library.removeMangaFromLibrary(mangaId) }
                         .thenApply { ctx.status(HttpStatus.OK) }
@@ -178,7 +190,7 @@ object MangaController {
                 }
             },
             behaviorOf = { ctx, mangaId ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_READ)
                 ctx.json(CategoryManga.getMangaCategories(mangaId))
             },
             withResults = {
@@ -198,7 +210,7 @@ object MangaController {
                 }
             },
             behaviorOf = { ctx, mangaId, categoryId ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_CATEGORY_EDIT)
                 CategoryManga.addMangaToCategory(mangaId, categoryId)
                 ctx.status(200)
             },
@@ -219,7 +231,7 @@ object MangaController {
                 }
             },
             behaviorOf = { ctx, mangaId, categoryId ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_CATEGORY_EDIT)
                 CategoryManga.removeMangaFromCategory(mangaId, categoryId)
                 ctx.status(200)
             },
@@ -241,7 +253,7 @@ object MangaController {
                 }
             },
             behaviorOf = { ctx, mangaId, key, value ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_CATEGORY_EDIT)
                 Manga.modifyMangaMeta(mangaId, key, value)
                 ctx.status(200)
             },
@@ -267,7 +279,7 @@ object MangaController {
                 }
             },
             behaviorOf = { ctx, mangaId, onlineFetch ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_READ)
                 ctx.future {
                     future { Chapter.getChapterList(mangaId, onlineFetch) }
                         .thenApply { ctx.json(it) }
@@ -293,7 +305,7 @@ object MangaController {
             behaviorOf = { ctx, mangaId ->
                 ctx.future {
                     future {
-                        ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                        ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_READ)
                         val input = json.decodeFromString<Chapter.MangaChapterBatchEditInput>(ctx.body())
                         Chapter.modifyChapters(input, mangaId)
                     }
@@ -317,7 +329,7 @@ object MangaController {
             behaviorOf = { ctx ->
                 ctx.future {
                     future {
-                        ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                        ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_READ)
                         val input = json.decodeFromString<Chapter.ChapterBatchEditInput>(ctx.body())
                         Chapter.modifyChapters(
                             Chapter.MangaChapterBatchEditInput(
@@ -346,10 +358,11 @@ object MangaController {
                 }
             },
             behaviorOf = { ctx, mangaId, chapterIndex ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_READ)
                 ctx.future {
                     future {
                         var chapter = getChapterDownloadReadyByIndex(chapterIndex, mangaId)
+                        OptimizationManager.ensureAccessible(chapter.id)
                         val syncResult = KoreaderSyncService.checkAndPullProgress(chapter.id)
 
                         if (syncResult != null) {
@@ -395,8 +408,8 @@ object MangaController {
                 }
             },
             behaviorOf = { ctx, mangaId, chapterIndex, read, bookmarked, markPrevRead, lastPageRead ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
-                val chapterId = Chapter.modifyChapter(mangaId, chapterIndex, read, bookmarked, markPrevRead, lastPageRead)
+                val userId = ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_READ)
+                val chapterId = Chapter.modifyChapterForUser(userId, mangaId, chapterIndex, read, bookmarked, markPrevRead, lastPageRead)
 
                 // Sync with KoreaderSync when progress is updated
                 if (lastPageRead != null || read == true) {
@@ -424,7 +437,7 @@ object MangaController {
             behaviorOf = { ctx, mangaId, chapterIndex ->
                 ctx.future {
                     future {
-                        ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                        ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_READ)
                         Chapter.deleteChapter(mangaId, chapterIndex)
 
                         ctx.status(200)
@@ -451,7 +464,7 @@ object MangaController {
                 }
             },
             behaviorOf = { ctx, mangaId, chapterIndex, key, value ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_READ)
                 Chapter.modifyChapterMeta(mangaId, chapterIndex, key, value)
 
                 ctx.status(200)
@@ -480,10 +493,10 @@ object MangaController {
                 }
             },
             behaviorOf = { ctx, mangaId, chapterIndex, index, updateProgress, format, opds ->
-                if (opds == true) {
+                val userId = if (opds == true) {
                     ctx.getAttribute(Attribute.TachideskUser).requireUserWithBasicFallback(ctx)
                 } else {
-                    ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                    ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_READ)
                 }
 
                 ctx.future {
@@ -501,7 +514,7 @@ object MangaController {
                         ctx.result(it.first)
 
                         if (updateProgress == true) {
-                            val chapterId = Chapter.updateChapterProgress(mangaId, chapterIndex, pageNo = index)
+                            val chapterId = Chapter.updateChapterProgressForUser(userId, mangaId, chapterIndex, pageNo = index)
                             // Sync progress with KoreaderSync if chapter update was successful
                             if (chapterId != -1) {
                                 GlobalScope.launch { KoreaderSyncService.pushProgress(chapterId) }
@@ -527,7 +540,7 @@ object MangaController {
                 }
             },
             behaviorOf = { ctx, chapterId, markAsRead ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_READ)
                 ctx.disableCompression()
                 val contentType = serverConfig.opdsCbzMimetype.value.mediaType
                 if (ctx.method() == HandlerType.HEAD) {

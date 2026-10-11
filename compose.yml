@@ -1,0 +1,29 @@
+name: suwairo
+
+services:
+    server:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        restart: unless-stopped
+        ports:
+            - "${SUWAIRO_PORT:-4567}:4567"
+        volumes:
+            - suwairo-data:/data
+            - ${SUWAIRO_BRANDING_DIR:-./branding}:/branding:ro
+        environment:
+            TZ: ${TZ:-Etc/UTC}
+            SUWAIRO_LOGO_PATH: ${SUWAIRO_LOGO_PATH:-/branding/logo.png}
+            # Authentication is enabled by default; set SUWAIRO_AUTH_MODE=NONE only for local unauthenticated runs.
+            SUWAIRO_AUTH_MODE: ${SUWAIRO_AUTH_MODE:-UI_LOGIN}
+            SUWAIRO_AUTH_USERNAME: ${SUWAIRO_AUTH_USERNAME:-}
+            SUWAIRO_AUTH_PASSWORD: ${SUWAIRO_AUTH_PASSWORD:-}
+        healthcheck:
+            test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:4567/ || exit 1"]
+            interval: 10s
+            timeout: 5s
+            retries: 30
+            start_period: 30s
+
+volumes:
+    suwairo-data:

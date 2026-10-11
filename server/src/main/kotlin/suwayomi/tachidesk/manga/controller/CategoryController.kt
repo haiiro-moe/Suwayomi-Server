@@ -14,7 +14,8 @@ import suwayomi.tachidesk.manga.model.dataclass.CategoryDataClass
 import suwayomi.tachidesk.manga.model.dataclass.MangaDataClass
 import suwayomi.tachidesk.server.JavalinSetup.Attribute
 import suwayomi.tachidesk.server.JavalinSetup.getAttribute
-import suwayomi.tachidesk.server.user.requireUser
+import suwayomi.tachidesk.server.user.PermissionNodes
+import suwayomi.tachidesk.server.user.requirePermission
 import suwayomi.tachidesk.server.util.formParam
 import suwayomi.tachidesk.server.util.handler
 import suwayomi.tachidesk.server.util.pathParam
@@ -31,7 +32,7 @@ object CategoryController {
                 }
             },
             behaviorOf = { ctx ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_CATEGORY_READ)
                 ctx.json(Category.getCategoryList())
             },
             withResults = {
@@ -50,7 +51,7 @@ object CategoryController {
                 }
             },
             behaviorOf = { ctx, name ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_CATEGORY_CREATE)
                 if (Category.createCategory(name) != -1) {
                     ctx.status(200)
                 } else {
@@ -78,7 +79,7 @@ object CategoryController {
                 }
             },
             behaviorOf = { ctx, categoryId, name, isDefault, includeInUpdate, includeInDownload ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_CATEGORY_EDIT)
                 Category.updateCategory(categoryId, name, isDefault, includeInUpdate, includeInDownload)
                 ctx.status(200)
             },
@@ -98,7 +99,7 @@ object CategoryController {
                 }
             },
             behaviorOf = { ctx, categoryId ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_CATEGORY_DELETE)
                 Category.removeCategory(categoryId)
                 ctx.status(200)
             },
@@ -118,7 +119,7 @@ object CategoryController {
                 }
             },
             behaviorOf = { ctx, categoryId ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_CATEGORY_READ)
                 ctx.json(CategoryManga.getCategoryMangaList(categoryId))
             },
             withResults = {
@@ -138,7 +139,7 @@ object CategoryController {
                 }
             },
             behaviorOf = { ctx, from, to ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_CATEGORY_EDIT)
                 Category.reorderCategory(from, to)
                 ctx.status(200)
             },
@@ -160,7 +161,7 @@ object CategoryController {
                 }
             },
             behaviorOf = { ctx, categoryId, key, value ->
-                ctx.getAttribute(Attribute.TachideskUser).requireUser()
+                ctx.getAttribute(Attribute.TachideskUser).requirePermission(PermissionNodes.LIBRARY_CATEGORY_EDIT)
                 Category.modifyMeta(categoryId, key, value)
                 ctx.status(200)
             },

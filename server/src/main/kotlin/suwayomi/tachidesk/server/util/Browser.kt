@@ -39,8 +39,8 @@ object Browser {
                 try {
                     Desktop.browseURL(appBaseUrl)
                 } catch (e: Throwable) {
-                    // cover both java.lang.Exception and java.lang.Error
-                    logger.error(e) { "openInBrowser: failed to launch browser due to" }
+                    // Desktop browsing is unavailable in headless/server environments.
+                    logger.warn { "openInBrowser: browser unavailable; open $appBaseUrl manually" }
                 }
             }
         }

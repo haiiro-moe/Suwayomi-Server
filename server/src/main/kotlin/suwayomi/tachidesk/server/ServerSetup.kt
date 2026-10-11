@@ -40,6 +40,7 @@ import suwayomi.tachidesk.manga.impl.backup.proto.ProtoBackupExport
 import suwayomi.tachidesk.manga.impl.download.DownloadManager
 import suwayomi.tachidesk.manga.impl.extension.Extension
 import suwayomi.tachidesk.manga.impl.extension.ExtensionStoreService
+import suwayomi.tachidesk.manga.impl.optimize.OptimizationManager
 import suwayomi.tachidesk.manga.impl.update.IUpdater
 import suwayomi.tachidesk.manga.impl.update.Updater
 import suwayomi.tachidesk.manga.impl.util.lang.renameTo
@@ -333,6 +334,9 @@ fun applicationSetup() {
         runMigrations(applicationDirs) {
             databaseUp()
         }
+        suwayomi.tachidesk.server.user.UserService.ensureBootstrapUser()?.let { ownerId ->
+            suwayomi.tachidesk.server.user.UserChapterStateService.migrateLegacyStateToOwner(ownerId)
+        }
     }
 
     try {
@@ -456,6 +460,9 @@ fun applicationSetup() {
 
     // start DownloadManager and restore + resume downloads
     DownloadManager.restoreAndResumeDownloads()
+
+    // restore + resume chapter optimizations
+    OptimizationManager.restoreAndResume()
 
     SyncManager.scheduleSyncTask()
 

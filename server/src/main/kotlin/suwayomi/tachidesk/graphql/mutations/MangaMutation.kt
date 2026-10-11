@@ -5,6 +5,7 @@ package suwayomi.tachidesk.graphql.mutations
 import com.expediagroup.graphql.generator.annotations.GraphQLDeprecated
 import com.expediagroup.graphql.server.extensions.toGraphQLError
 import graphql.execution.DataFetcherResult
+import graphql.schema.DataFetchingEnvironment
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jetbrains.exposed.v1.core.LikePattern
 import org.jetbrains.exposed.v1.core.Op
@@ -18,6 +19,8 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
 import suwayomi.tachidesk.graphql.directives.RequireAuth
+import suwayomi.tachidesk.graphql.directives.RequirePermission
+import suwayomi.tachidesk.server.user.PermissionNodes
 import suwayomi.tachidesk.graphql.types.ChapterType
 import suwayomi.tachidesk.graphql.types.MangaMetaType
 import suwayomi.tachidesk.graphql.types.MangaType
@@ -30,6 +33,10 @@ import suwayomi.tachidesk.manga.model.table.MangaMetaTable
 import suwayomi.tachidesk.manga.model.table.MangaTable
 import suwayomi.tachidesk.manga.model.table.toDataClass
 import suwayomi.tachidesk.server.JavalinSetup.future
+import suwayomi.tachidesk.graphql.server.getAttribute
+import suwayomi.tachidesk.server.JavalinSetup.Attribute
+import suwayomi.tachidesk.server.user.CategoryAccessService
+import suwayomi.tachidesk.server.user.requireUser
 import uy.kohesive.injekt.injectLazy
 import java.time.Instant
 import java.util.concurrent.CompletableFuture
@@ -103,9 +110,14 @@ class MangaMutation {
         }
     }
 
-    @RequireAuth
-    fun updateManga(input: UpdateMangaInput): CompletableFuture<UpdateMangaPayload?> {
+    @RequirePermission(PermissionNodes.BROWSE_ADD_TO_LIBRARY)
+    fun updateManga(
+        dataFetchingEnvironment: graphql.schema.DataFetchingEnvironment,
+        input: UpdateMangaInput,
+    ): CompletableFuture<UpdateMangaPayload?> {
         val (clientMutationId, id, patch) = input
+        val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
+        CategoryAccessService.requireReadableManga(userId, listOf(id))
 
         return future {
             updateMangas(listOf(id), patch)
@@ -122,9 +134,14 @@ class MangaMutation {
         }
     }
 
-    @RequireAuth
-    fun updateMangas(input: UpdateMangasInput): CompletableFuture<UpdateMangasPayload?> {
+    @RequirePermission(PermissionNodes.BROWSE_ADD_TO_LIBRARY)
+    fun updateMangas(
+        dataFetchingEnvironment: graphql.schema.DataFetchingEnvironment,
+        input: UpdateMangasInput,
+    ): CompletableFuture<UpdateMangasPayload?> {
         val (clientMutationId, ids, patch) = input
+        val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
+        CategoryAccessService.requireReadableManga(userId, ids)
 
         return future {
             updateMangas(ids, patch)
@@ -151,10 +168,15 @@ class MangaMutation {
         val manga: MangaType,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.UPDATES_TRIGGER)
     @GraphQLDeprecated("Deprecated in Tachiyomix 1.6", ReplaceWith("fetchMangaAndChapters"))
-    fun fetchManga(input: FetchMangaInput): CompletableFuture<FetchMangaPayload?> {
+    fun fetchManga(
+        dataFetchingEnvironment: DataFetchingEnvironment,
+        input: FetchMangaInput,
+    ): CompletableFuture<FetchMangaPayload?> {
         val (clientMutationId, id) = input
+        val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
+        CategoryAccessService.requireReadableManga(userId, listOf(id))
 
         return future {
             Manga.updateMangaAndChapters(id, updateChapters = false)
@@ -183,9 +205,14 @@ class MangaMutation {
         val chapters: List<ChapterType>,
     )
 
-    @RequireAuth
-    fun fetchMangaAndChapters(input: FetchMangaAndChaptersInput): CompletableFuture<DataFetcherResult<FetchMangaAndChaptersPayload?>> {
+    @RequirePermission(PermissionNodes.UPDATES_TRIGGER)
+    fun fetchMangaAndChapters(
+        dataFetchingEnvironment: DataFetchingEnvironment,
+        input: FetchMangaAndChaptersInput,
+    ): CompletableFuture<DataFetcherResult<FetchMangaAndChaptersPayload?>> {
         val (clientMutationId, id, fetchManga, fetchChapters) = input
+        val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
+        CategoryAccessService.requireReadableManga(userId, listOf(id))
 
         return future {
             val error =

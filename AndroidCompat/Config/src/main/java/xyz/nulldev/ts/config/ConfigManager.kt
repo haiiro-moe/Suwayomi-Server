@@ -70,10 +70,58 @@ open class ConfigManager {
 
         // Load user config
         val userConfig = getUserConfig()
+        val environmentConfig =
+            ConfigFactory.parseMap(
+                buildMap {
+                    System.getenv("SUWAIRO_AUTH_MODE")?.trim()?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.authMode", it.uppercase())
+                    }
+                    System.getenv("SUWAIRO_AUTH_USERNAME")?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.authUsername", it)
+                    }
+                    System.getenv("SUWAIRO_AUTH_PASSWORD")?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.authPassword", it)
+                    }
+                    System.getenv("SUWAIRO_SSO_ISSUER_URL")?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.ssoIssuerUrl", it)
+                    }
+                    System.getenv("SUWAIRO_SSO_CLIENT_ID")?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.ssoClientId", it)
+                    }
+                    System.getenv("SUWAIRO_SSO_CLIENT_SECRET")?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.ssoClientSecret", it)
+                    }
+                    System.getenv("SUWAIRO_SSO_DEFAULT_ROLE")?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.ssoDefaultRole", it)
+                    }
+                    System.getenv("SUWAIRO_SSO_SCOPE")?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.ssoScope", it)
+                    }
+                    System.getenv("SUWAIRO_SSO_PUBLIC_URL")?.takeIf { it.isNotEmpty() }?.let {
+                        put("server.ssoPublicUrl", it)
+                    }
+                    // FlareSolverr (or a compatible solver like Byparr); both the SUWAIRO_ prefixed and the
+                    // upstream docker image's unprefixed names are accepted
+                    mapOf(
+                        "FLARESOLVERR_ENABLED" to "server.flareSolverrEnabled",
+                        "FLARESOLVERR_URL" to "server.flareSolverrUrl",
+                        "FLARESOLVERR_TIMEOUT" to "server.flareSolverrTimeout",
+                        "FLARESOLVERR_SESSION_NAME" to "server.flareSolverrSessionName",
+                        "FLARESOLVERR_SESSION_TTL" to "server.flareSolverrSessionTtl",
+                        "FLARESOLVERR_RESPONSE_AS_FALLBACK" to "server.flareSolverrAsResponseFallback",
+                    ).forEach { (env, path) ->
+                        (System.getenv("SUWAIRO_$env") ?: System.getenv(env))
+                            ?.trim()
+                            ?.takeIf { it.isNotEmpty() }
+                            ?.let { put(path, it) }
+                    }
+                },
+            )
 
         val config =
             ConfigFactory
                 .empty()
+                .withFallback(environmentConfig)
                 .withFallback(baseConfig)
                 .withFallback(userConfig)
                 .withFallback(compatConfig)

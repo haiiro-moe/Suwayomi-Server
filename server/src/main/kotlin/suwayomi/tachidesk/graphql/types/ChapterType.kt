@@ -7,6 +7,8 @@
 
 package suwayomi.tachidesk.graphql.types
 
+import com.expediagroup.graphql.generator.annotations.GraphQLDescription
+import com.expediagroup.graphql.generator.annotations.GraphQLIgnore
 import com.expediagroup.graphql.server.extensions.getValueFromDataLoader
 import graphql.schema.DataFetchingEnvironment
 import org.jetbrains.exposed.v1.core.ResultRow
@@ -15,8 +17,13 @@ import suwayomi.tachidesk.graphql.server.primitives.Edge
 import suwayomi.tachidesk.graphql.server.primitives.Node
 import suwayomi.tachidesk.graphql.server.primitives.NodeList
 import suwayomi.tachidesk.graphql.server.primitives.PageInfo
+import suwayomi.tachidesk.manga.impl.optimize.OptimizationManager
 import suwayomi.tachidesk.manga.model.dataclass.ChapterDataClass
 import suwayomi.tachidesk.manga.model.table.ChapterTable
+import suwayomi.tachidesk.server.JavalinSetup.Attribute
+import suwayomi.tachidesk.server.user.UserChapterStateService
+import suwayomi.tachidesk.server.user.requireUser
+import suwayomi.tachidesk.graphql.server.getAttribute
 import java.util.concurrent.CompletableFuture
 
 data class SyncConflictInfoType(
@@ -41,6 +48,7 @@ class ChapterType(
     val fetchedAt: Long,
     val isDownloaded: Boolean,
     val pageCount: Int,
+    val isOptimized: Boolean = false,
 //    val chapterCount: Int?,
 ) : Node {
     companion object {
@@ -73,6 +81,7 @@ class ChapterType(
         row[ChapterTable.fetchedAt],
         row[ChapterTable.isDownloaded],
         row[ChapterTable.pageCount],
+        row[ChapterTable.isOptimized],
 //        transaction { ChapterTable.selectAll().where { Manga eq chapterEntry[manga].value }.count().toInt() },
     )
 
@@ -93,10 +102,51 @@ class ChapterType(
         dataClass.fetchedAt,
         dataClass.downloaded,
         dataClass.pageCount,
+        dataClass.optimized,
     )
+
+    @GraphQLDescription(
+        "Whether the chapter is queued for optimization, in which case it can't be opened. " +
+            "Available without the \"optimizations.read\" permission, unlike the optimization queue.",
+    )
+    fun isOptimizing(): Boolean = OptimizationManager.isQueued(id)
 
     fun manga(dataFetchingEnvironment: DataFetchingEnvironment): CompletableFuture<MangaType> =
         dataFetchingEnvironment.getValueFromDataLoader<Int, MangaType>("MangaDataLoader", mangaId)
+
+    fun isRead(dataFetchingEnvironment: DataFetchingEnvironment): Boolean =
+        UserChapterStateService.getOrDefault(
+            dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser(),
+            id,
+        ).isRead
+
+    fun isBookmarked(dataFetchingEnvironment: DataFetchingEnvironment): Boolean =
+        UserChapterStateService.getOrDefault(
+            dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser(),
+            id,
+        ).isBookmarked
+
+    fun lastPageRead(dataFetchingEnvironment: DataFetchingEnvironment): Int =
+        UserChapterStateService.getOrDefault(
+            dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser(),
+            id,
+        ).lastPageRead
+
+    fun lastReadAt(dataFetchingEnvironment: DataFetchingEnvironment): Long =
+        UserChapterStateService.getOrDefault(
+            dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser(),
+            id,
+        ).lastReadAt
+
+    @GraphQLIgnore
+    fun withUserState(state: suwayomi.tachidesk.server.user.UserChapterState?): ChapterType {
+        if (state == null) return this
+        return ChapterType(
+            id, url, name, uploadDate, chapterNumber, scanlator, mangaId,
+            state.isRead, state.isBookmarked, state.lastPageRead, state.lastReadAt,
+            sourceOrder, realUrl, fetchedAt, isDownloaded, pageCount, isOptimized,
+        )
+    }
 
     fun meta(dataFetchingEnvironment: DataFetchingEnvironment): CompletableFuture<List<ChapterMetaType>> =
         dataFetchingEnvironment.getValueFromDataLoader<Int, List<ChapterMetaType>>("ChapterMetaDataLoader", id)

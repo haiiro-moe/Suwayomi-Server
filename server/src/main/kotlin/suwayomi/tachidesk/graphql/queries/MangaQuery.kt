@@ -10,8 +10,13 @@ package suwayomi.tachidesk.graphql.queries
 import com.expediagroup.graphql.generator.annotations.GraphQLDeprecated
 import com.expediagroup.graphql.server.extensions.getValueFromDataLoader
 import graphql.schema.DataFetchingEnvironment
+import suwayomi.tachidesk.graphql.server.getAttribute
+import suwayomi.tachidesk.server.JavalinSetup.Attribute
+import suwayomi.tachidesk.server.user.CategoryAccessService
+import suwayomi.tachidesk.server.user.requireUser
 import org.jetbrains.exposed.v1.core.Column
 import org.jetbrains.exposed.v1.core.Op
+import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.SortOrder
 import org.jetbrains.exposed.v1.core.greater
 import org.jetbrains.exposed.v1.core.inList
@@ -230,6 +235,7 @@ class MangaQuery {
 
     @RequireAuth
     fun mangas(
+        dataFetchingEnvironment: DataFetchingEnvironment,
         condition: MangaCondition? = null,
         filter: MangaFilter? = null,
         @GraphQLDeprecated(
@@ -249,6 +255,8 @@ class MangaQuery {
         last: Int? = null,
         offset: Int? = null,
     ): MangaNodeList {
+        val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
+        val visibleMangaIds = CategoryAccessService.readableMangaIds(userId)
         val queryResults =
             transaction {
                 val mangaIdsQuery =
@@ -260,9 +268,9 @@ class MangaQuery {
 
                 val res =
                     if (condition?.categoryIds != null || filter?.isFilteringForCategories() == true) {
-                        MangaTable.selectAll().where { MangaTable.id inSubQuery mangaIdsQuery }
+                        MangaTable.selectAll().where { (MangaTable.id inSubQuery mangaIdsQuery) and (MangaTable.id inList visibleMangaIds) }
                     } else {
-                        MangaTable.selectAll().applyOps(condition, filter)
+                        MangaTable.selectAll().where { MangaTable.id inList visibleMangaIds }.applyOps(condition, filter)
                     }
 
                 val baseSort = listOf(MangaOrder(MangaOrderBy.ID, SortOrder.ASC))

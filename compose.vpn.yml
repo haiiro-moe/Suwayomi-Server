@@ -1,0 +1,72 @@
+# Mullvad VPN overlay.
+#
+# Routes all outbound traffic of the server and FlareSolverr through a Mullvad WireGuard tunnel (gluetun), e.g. when
+# Cloudflare or a source blocks the host's IP address. Use it on top of either compose file:
+#
+#   docker compose -f compose.yml -f compose.vpn.yml up -d
+#   docker compose -f compose.sso.yml -f compose.vpn.yml up -d
+#
+# Get the WireGuard values from https://mullvad.net/en/account/wireguard-config (generate a key, download any
+# Linux config, and copy PrivateKey and Address from it) and set them in .env:
+#
+#   MULLVAD_WIREGUARD_PRIVATE_KEY=...
+#   MULLVAD_WIREGUARD_ADDRESSES=10.x.x.x/32
+#   MULLVAD_SERVER_COUNTRIES=Netherlands
+#
+# The server and FlareSolverr share the VPN container's network, so the web UI port is published on the vpn service
+# and anything that previously reached the server as `server:4567` (e.g. a reverse proxy on a docker network) has to
+# use `vpn:4567` instead. Both containers egress from the same Mullvad IP, which Cloudflare clearance cookies require.
+#
+# Docker rejects extra_hosts on a container that uses another container's network, so host overrides (e.g. pointing
+# the OIDC issuer at its LAN address) belong on the vpn service, and the address must be allowed past the tunnel:
+#
+#   services:
+#       vpn:
+#           extra_hosts:
+#               - "auth.example.com:10.0.0.101"
+#
+#   VPN_OUTBOUND_SUBNETS=10.0.0.101/32   (in .env)
+
+services:
+    vpn:
+        image: qmcgaw/gluetun:v3
+        container_name: suwairo-vpn
+        cap_add:
+            - NET_ADMIN
+        devices:
+            - /dev/net/tun:/dev/net/tun
+        ports:
+            - "${SUWAIRO_PORT:-4567}:4567"
+        environment:
+            TZ: ${TZ:-Etc/UTC}
+            VPN_SERVICE_PROVIDER: mullvad
+            VPN_TYPE: wireguard
+            WIREGUARD_PRIVATE_KEY: ${MULLVAD_WIREGUARD_PRIVATE_KEY:?set MULLVAD_WIREGUARD_PRIVATE_KEY in .env}
+            WIREGUARD_ADDRESSES: ${MULLVAD_WIREGUARD_ADDRESSES:?set MULLVAD_WIREGUARD_ADDRESSES in .env}
+            SERVER_COUNTRIES: ${MULLVAD_SERVER_COUNTRIES:-}
+            SERVER_CITIES: ${MULLVAD_SERVER_CITIES:-}
+            # Subnets reachable outside the tunnel, e.g. an OIDC provider on the LAN (comma separated CIDRs)
+            FIREWALL_OUTBOUND_SUBNETS: ${VPN_OUTBOUND_SUBNETS:-}
+        restart: unless-stopped
+    flaresolverr:
+        image: ghcr.io/thephaseless/byparr:latest
+        container_name: flaresolverr
+        network_mode: service:vpn
+        environment:
+            TZ: ${TZ:-Etc/UTC}
+        depends_on:
+            vpn:
+                condition: service_healthy
+        restart: unless-stopped
+    server:
+        network_mode: service:vpn
+        ports: !reset []
+        # set these on the vpn service instead, see above
+        extra_hosts: !reset []
+        environment:
+            FLARESOLVERR_ENABLED: true
+            # same network namespace as the solver
+            FLARESOLVERR_URL: http://127.0.0.1:8191
+        depends_on:
+            vpn:
+                condition: service_healthy

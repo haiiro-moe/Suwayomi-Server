@@ -4,11 +4,13 @@ import kotlinx.coroutines.CoroutineScope
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.update
 import suwayomi.tachidesk.manga.impl.chapter.getChapterDownloadReady
 import suwayomi.tachidesk.manga.impl.download.fileProvider.ChaptersFilesProvider
 import suwayomi.tachidesk.manga.impl.download.fileProvider.impl.ArchiveProvider
 import suwayomi.tachidesk.manga.impl.download.fileProvider.impl.FolderProvider
 import suwayomi.tachidesk.manga.impl.download.model.DownloadQueueItem
+import suwayomi.tachidesk.manga.impl.optimize.OptimizationManager
 import suwayomi.tachidesk.manga.impl.util.getChapterCbzPath
 import suwayomi.tachidesk.manga.impl.util.getChapterDownloadPath
 import suwayomi.tachidesk.manga.model.dataclass.ChapterDataClass
@@ -35,7 +37,21 @@ object ChapterDownloadHelper {
     suspend fun delete(
         mangaId: Int,
         chapterId: Int,
-    ): Boolean = provider(mangaId, chapterId).delete()
+    ): Boolean {
+        // an optimization in progress must not write the files back after they got deleted
+        OptimizationManager.dequeue(listOf(chapterId))
+
+        val deleted = provider(mangaId, chapterId).delete()
+        if (deleted) {
+            transaction {
+                ChapterTable.update({ ChapterTable.id eq chapterId }) {
+                    it[isOptimized] = false
+                }
+            }
+        }
+
+        return deleted
+    }
 
     /**
      * This function should never be called without calling [getChapterDownloadReady] beforehand.
@@ -63,7 +79,10 @@ object ChapterDownloadHelper {
     suspend fun getArchiveStreamWithSize(
         mangaId: Int,
         chapterId: Int,
-    ): Pair<InputStream, Long> = provider(mangaId, chapterId).getAsArchiveStream()
+    ): Pair<InputStream, Long> {
+        OptimizationManager.ensureAccessible(chapterId)
+        return provider(mangaId, chapterId).getAsArchiveStream()
+    }
 
     suspend fun getChapterArchiveSize(
         mangaId: Int,
@@ -123,6 +142,8 @@ object ChapterDownloadHelper {
         chapterId: Int,
         markAsRead: Boolean?,
     ): Triple<InputStream, String, Long> {
+        OptimizationManager.ensureAccessible(chapterId)
+
         val (chapterData, fileName) = getChapterWithCbzFileName(chapterId)
 
         val cbzFile = provider(chapterData.mangaId, chapterData.id).getAsArchiveStream()
@@ -142,6 +163,8 @@ object ChapterDownloadHelper {
     }
 
     suspend fun getCbzMetadataForDownload(chapterId: Int): Pair<String, Long> { // fileName, fileSize
+        OptimizationManager.ensureAccessible(chapterId)
+
         val (chapterData, fileName) = getChapterWithCbzFileName(chapterId)
 
         val fileSize = provider(chapterData.mangaId, chapterData.id).getArchiveSize()

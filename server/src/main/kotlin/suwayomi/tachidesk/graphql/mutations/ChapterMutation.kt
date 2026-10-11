@@ -28,13 +28,29 @@ import suwayomi.tachidesk.graphql.types.SyncConflictInfoType
 import suwayomi.tachidesk.manga.impl.Chapter
 import suwayomi.tachidesk.manga.impl.Manga
 import suwayomi.tachidesk.manga.impl.chapter.getChapterDownloadReadyById
+import suwayomi.tachidesk.manga.impl.optimize.OptimizationManager
 import suwayomi.tachidesk.manga.impl.sync.KoreaderSyncService
 import suwayomi.tachidesk.manga.model.table.ChapterMetaTable
 import suwayomi.tachidesk.manga.model.table.ChapterTable
+import suwayomi.tachidesk.server.JavalinSetup.Attribute
 import suwayomi.tachidesk.server.JavalinSetup.future
+import suwayomi.tachidesk.graphql.server.getAttribute
+import suwayomi.tachidesk.server.user.CategoryAccessService
+import suwayomi.tachidesk.server.user.UserChapterStateService
+import suwayomi.tachidesk.server.user.requireUser
 import java.net.URLEncoder
 import java.time.Instant
 import java.util.concurrent.CompletableFuture
+
+private fun requireVisibleChapters(userId: Int, chapterIds: Collection<Int>) {
+    val mangaIds = transaction {
+        ChapterTable.select(ChapterTable.manga)
+            .where { ChapterTable.id inList chapterIds }
+            .map { it[ChapterTable.manga].value }
+            .toSet()
+    }
+    CategoryAccessService.requireReadableManga(userId, mangaIds)
+}
 
 /**
  * TODO Mutations
@@ -71,11 +87,19 @@ class ChapterMutation {
     )
 
     private fun updateChapters(
+        userId: Int,
         ids: List<Int>,
         patch: UpdateChapterPatch,
     ) {
         if (ids.isEmpty()) {
             return
+        }
+        requireVisibleChapters(userId, ids)
+
+        if (patch.isRead != null || patch.isBookmarked != null || patch.lastPageRead != null) {
+            ids.forEach { chapterId ->
+                UserChapterStateService.update(userId, chapterId, patch.isRead, patch.isBookmarked, patch.lastPageRead)
+            }
         }
 
         transaction {
@@ -91,27 +115,7 @@ class ChapterMutation {
                 } else {
                     emptyMap()
                 }
-            if (patch.isRead != null || patch.isBookmarked != null || patch.lastPageRead != null) {
-                val now = Instant.now().epochSecond
 
-                BatchUpdateStatement(ChapterTable)
-                    .apply {
-                        ids.forEach { chapterId ->
-                            addBatch(EntityID(chapterId, ChapterTable))
-                            patch.isRead?.also {
-                                this[ChapterTable.isRead] = it
-                            }
-                            patch.isBookmarked?.also {
-                                this[ChapterTable.isBookmarked] = it
-                            }
-                            patch.lastPageRead?.also {
-                                this[ChapterTable.lastPageRead] = it.coerceAtMost(chapterIdToPageCount[chapterId] ?: 0).coerceAtLeast(0)
-                                this[ChapterTable.lastReadAt] = now
-                            }
-                        }
-                    }.toExecutable()
-                    .execute(this@transaction)
-            }
         }
 
         // Sync with KoreaderSync when progress is updated
@@ -125,10 +129,14 @@ class ChapterMutation {
     }
 
     @RequireAuth
-    fun updateChapter(input: UpdateChapterInput): UpdateChapterPayload? {
+    fun updateChapter(
+        dataFetchingEnvironment: graphql.schema.DataFetchingEnvironment,
+        input: UpdateChapterInput,
+    ): UpdateChapterPayload? {
         val (clientMutationId, id, patch) = input
+        val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
 
-        updateChapters(listOf(id), patch)
+        updateChapters(userId, listOf(id), patch)
 
         val chapter =
             transaction {
@@ -142,10 +150,14 @@ class ChapterMutation {
     }
 
     @RequireAuth
-    fun updateChapters(input: UpdateChaptersInput): UpdateChaptersPayload? {
+    fun updateChapters(
+        dataFetchingEnvironment: graphql.schema.DataFetchingEnvironment,
+        input: UpdateChaptersInput,
+    ): UpdateChaptersPayload? {
         val (clientMutationId, ids, patch) = input
+        val userId = dataFetchingEnvironment.getAttribute(Attribute.TachideskUser).requireUser()
 
-        updateChapters(ids, patch)
+        updateChapters(userId, ids, patch)
 
         val chapters =
             transaction {
@@ -408,6 +420,8 @@ class ChapterMutation {
         val paramsMap = input.toParams()
 
         return future {
+            OptimizationManager.ensureAccessible(chapterId)
+
             var chapter = getChapterDownloadReadyById(chapterId)
             val syncResult = KoreaderSyncService.checkAndPullProgress(chapter.id)
             var syncConflictInfo: SyncConflictInfoType? = null

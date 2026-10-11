@@ -35,6 +35,7 @@ import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
 import suwayomi.tachidesk.manga.impl.download.DownloadManager
 import suwayomi.tachidesk.manga.impl.download.DownloadManager.EnqueueInput
+import suwayomi.tachidesk.manga.impl.optimize.OptimizationManager
 import suwayomi.tachidesk.manga.impl.track.Track
 import suwayomi.tachidesk.manga.impl.util.updateChapterDownloadDir
 import suwayomi.tachidesk.manga.model.dataclass.ChapterDataClass
@@ -47,6 +48,7 @@ import suwayomi.tachidesk.manga.model.table.MangaTable
 import suwayomi.tachidesk.manga.model.table.PageTable
 import suwayomi.tachidesk.manga.model.table.toDataClass
 import suwayomi.tachidesk.server.serverConfig
+import suwayomi.tachidesk.server.user.UserChapterStateService
 import java.time.Instant
 import java.util.TreeSet
 import kotlin.math.max
@@ -238,6 +240,7 @@ object Chapter {
             // we got some clean up due
             if (chaptersIdsToDelete.isNotEmpty()) {
                 DownloadManager.dequeue(chaptersIdsToDelete)
+                OptimizationManager.dequeue(chaptersIdsToDelete)
                 PageTable.deleteWhere { chapter inList chaptersIdsToDelete }
                 ChapterTable.deleteWhere { id inList chaptersIdsToDelete }
             }
@@ -297,6 +300,7 @@ object Chapter {
 
                                 this[ChapterTable.isDownloaded] = true
                                 this[ChapterTable.pageCount] = deletedDownloadedChapterByChapterNumber[it.chapterNumber]!!.pageCount
+                                this[ChapterTable.isOptimized] = deletedDownloadedChapterByChapterNumber[it.chapterNumber]!!.optimized
                             }
                         }.toExecutable()
                         .execute(this@suspendTransaction)
@@ -446,6 +450,34 @@ object Chapter {
             ).toSet()
 
         return limitedChaptersToDownloadWithDuplicates.map { it.id }
+    }
+
+    fun modifyChapterForUser(
+        userId: Int,
+        mangaId: Int,
+        chapterIndex: Int,
+        isRead: Boolean?,
+        isBookmarked: Boolean?,
+        markPrevRead: Boolean?,
+        lastPageRead: Int?,
+    ): Int {
+        val chapterIds =
+            transaction {
+                ChapterTable.select(ChapterTable.id).where {
+                    (ChapterTable.manga eq mangaId) and (ChapterTable.sourceOrder less chapterIndex)
+                }.map { it[ChapterTable.id].value }
+            }
+        val chapterId =
+            transaction {
+                ChapterTable.select(ChapterTable.id).where {
+                    (ChapterTable.manga eq mangaId) and (ChapterTable.sourceOrder eq chapterIndex)
+                }.first()[ChapterTable.id].value
+            }
+        UserChapterStateService.update(userId, chapterId, isRead, isBookmarked, lastPageRead)
+        if (markPrevRead != null) {
+            chapterIds.forEach { id -> UserChapterStateService.update(userId, id, markPrevRead, null, null) }
+        }
+        return chapterId
     }
 
     fun modifyChapter(
@@ -774,6 +806,23 @@ object Chapter {
                     }
             }
         }
+
+    fun updateChapterProgressForUser(
+        userId: Int,
+        mangaId: Int,
+        chapterIndex: Int,
+        pageNo: Int,
+    ): Int {
+        val chapterData =
+            transaction {
+                ChapterTable.selectAll().where {
+                    (ChapterTable.sourceOrder eq chapterIndex) and (ChapterTable.manga eq mangaId)
+                }.first().let { ChapterTable.toDataClass(it) }
+            }
+        val isRead = chapterData.pageCount.takeIf { it == pageNo.inc() }?.let { true }
+        UserChapterStateService.update(userId, chapterData.id, isRead, null, pageNo)
+        return chapterData.id
+    }
 
     fun updateChapterProgress(
         mangaId: Int,

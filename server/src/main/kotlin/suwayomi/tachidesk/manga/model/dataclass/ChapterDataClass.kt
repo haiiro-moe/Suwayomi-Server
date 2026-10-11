@@ -42,6 +42,8 @@ data class ChapterDataClass(
     val realUrl: String? = null,
     /** is chapter downloaded */
     val downloaded: Boolean,
+    /** downloaded files were optimized */
+    val optimized: Boolean = false,
     /** used to construct pages in the front-end */
     val pageCount: Int = -1,
     val lastModifiedAt: Long = 0,

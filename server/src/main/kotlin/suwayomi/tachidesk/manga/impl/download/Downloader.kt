@@ -35,6 +35,7 @@ import suwayomi.tachidesk.manga.impl.download.model.DownloadUpdateType.FINISHED
 import suwayomi.tachidesk.manga.impl.download.model.DownloadUpdateType.PAUSED
 import suwayomi.tachidesk.manga.impl.download.model.DownloadUpdateType.PROGRESS
 import suwayomi.tachidesk.manga.impl.download.model.DownloadUpdateType.STOPPED
+import suwayomi.tachidesk.manga.impl.optimize.OptimizationManager
 import suwayomi.tachidesk.manga.model.table.ChapterTable
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -177,6 +178,8 @@ class Downloader(
                     step(PROGRESS, downloadChapter, immediate)
                 }
                 download.state = Finished
+                // queue before marking as downloaded, otherwise the chapter could be opened before it got optimized
+                OptimizationManager.enqueueDownloaded(download.chapterId, download.mangaId)
                 transaction {
                     ChapterTable.update(
                         { (ChapterTable.id eq download.chapterId) },

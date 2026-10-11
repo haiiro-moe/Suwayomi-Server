@@ -3,7 +3,8 @@
 package suwayomi.tachidesk.graphql.mutations
 
 import com.expediagroup.graphql.generator.annotations.GraphQLIgnore
-import suwayomi.tachidesk.graphql.directives.RequireAuth
+import suwayomi.tachidesk.graphql.directives.RequirePermission
+import suwayomi.tachidesk.server.user.PermissionNodes
 import suwayomi.tachidesk.graphql.types.PartialSettingsType
 import suwayomi.tachidesk.graphql.types.Settings
 import suwayomi.tachidesk.graphql.types.SettingsType
@@ -34,7 +35,7 @@ class SettingsMutation {
         SettingsUpdater.updateAll(settings)
     }
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.SETTINGS_EDIT)
     fun setSettings(input: SetSettingsInput): SetSettingsPayload {
         val (clientMutationId, settings) = input
 
@@ -52,7 +53,7 @@ class SettingsMutation {
         val settings: SettingsType,
     )
 
-    @RequireAuth
+    @RequirePermission(PermissionNodes.SETTINGS_EDIT)
     fun resetSettings(input: ResetSettingsInput): ResetSettingsPayload {
         val (clientMutationId) = input
 
