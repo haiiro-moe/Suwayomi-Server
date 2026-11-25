@@ -63,6 +63,28 @@ You need these software packages installed in order to build the project
 
 - Java Development Kit version 21 or newer(we suggest using Zulu or Temurin instead of Oracle JDK)
 
+### Nix / NixOS
+The repository ships a `flake.nix` (x86_64-linux and aarch64-linux) with a development shell that provides everything listed above:
+OpenJDK 25 (the version CI uses, the bytecode target stays Java 21) with `JAVA_HOME` set, and `git` (the build derives its version from the commit count).
+Gradle itself is not provided: `./gradlew` downloads it as usual and it runs fine on the Nix JDK.
+
+- `nix develop` enters the shell, or `nix develop -c <command>` runs a single command in it, e.g. `nix develop -c ./gradlew :server:run`
+- with [direnv](https://direnv.net/) and [nix-direnv](https://github.com/nix-community/nix-direnv), run `direnv allow` once and the shell loads automatically through the committed `.envrc`
+- `nix run` (from the repository root) is a shortcut for `./gradlew :server:run`, extra arguments are passed on to Gradle
+- all other commands in this document (`ktlintCheck`, `:server:test`, `server:downloadWebUI server:shadowJar`, ...) work unchanged inside the shell
+
+Keep in mind that compiling Kotlin runs `ktlintFormat` first, so a build can reformat source files. Check `git status` afterwards.
+If `:server:compileKotlin` fails with `OutOfMemoryError: Java heap space`, give the Kotlin daemon more memory,
+e.g. `kotlin.daemon.jvmargs=-Xmx4g` in `~/.gradle/gradle.properties` (see `.github/runner-files/ci-gradle.properties` for the CI settings).
+
+The shell also sets `LD_LIBRARY_PATH` to the libraries needed by native code that is downloaded at run time,
+since NixOS has no `/usr/lib`: the KCEF WebView (`server.kcefEnabled`, Chromium Embedded Framework fetched into `<data dir>/bin/kcef`)
+and the system tray icon (`server.systemTrayEnabled`, GTK 3 and libappindicator3).
+KCEF also starts helper executables (`jcef_helper`, `cef_server`) built for regular Linux distributions, which need
+[`programs.nix-ld.enable = true`](https://github.com/nix-community/nix-ld) in the NixOS configuration to run.
+If KCEF is not needed, set `server.kcefEnabled = false`.
+There is no Nix package for the server jar itself, because a hermetic build would require pinning every Gradle dependency.
+
 ### building the full-blown jar (Suwayomi-Server + Suwayomi-WebUI bundle)
 Run `./gradlew server:downloadWebUI server:shadowJar`, the resulting built jar file will be `server/build/Suwayomi-Server-vX.Y.Z-rxxx.jar`.
 

@@ -21,3 +21,8 @@ scripts/zulu*
 scripts/electron-*
 scripts/rcedit-*
 scripts/resources/*.so
+
+# Nix and direnv (see flake.nix)
+result
+result-*
+.direnv
