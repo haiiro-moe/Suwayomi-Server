@@ -7,45 +7,122 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased] (Preview)
 
 ### Added
-- (**SyncYomi**) Support sync protocol v2: the server merges, only changes since the last upload are sent and category deletions are reported explicitly
+- (**API**) Add User Accounts
+- (**Database**) Add indexes on ChapterTable and ChapterUserTable for faster queries
+- (**Database/Settings/API**) Add setting `databaseSchema` to be able to configure the database schema name
+- (**Database/Settings/API**) Add setting `hikariMaxPoolSize` to be able to configure the maximum number of connections to the database
+- (**Extension/Android**) Implement android.net.Network*
+- (**System**) Embed AppImage update information for delta updates
+- (**System**) Support ppc64 and s390x architectures
+- (**Tracker**) Add MangaBaka tracker
+
+### Changed
+- (**Manga/API**) Find cached covers and pages by their usual extensions instead of listing their whole directory for each image
+- (**GraphQL**) Count the nodes of list fields in SQL when `totalCount` is their only selection
+- (**GraphQL**) Find manga with duplicate chapter numbers with one group per manga instead of one per chapter number
+- (**GraphQL**) Find the chapters of the chapter-per-manga data loaders in SQL instead of in memory
+- (**GraphQL**) Skip the count and first/last lookups of paginated lists when `totalCount` and `pageInfo.hasNextPage`/`hasPreviousPage` aren't selected
+- (**GraphQL**) Write data loader ids into the SQL instead of binding them
+- (**Updates**) Index chapters by fetch time for the updates list
+- (**WebView**) Start CEF the first time a webview needs it instead of at startup
+- (**WebView**) Stream frames as JPEG binary messages at up to 20 fps, sending only the latest frame and waiting for the client to receive the previous ones, instead of a PNG in JSON for every repaint
+
+### Fixed
+- (**API**) Answer 424 instead of 500 when a source fails
+- (**Auth**) Stop logging routine expired-token rejections as errors
+- (**Backup/Sync**) Keep cached covers on restore and sync unless the manga is new or its thumbnail url changed
+- (**Backup**) Restore reading history for existing chapters omitted from a file backup's chapter records
+- (**Backup/API**) Fix restore mutations timing out when progress notifications arrive before subscription
+- (**Downloads**) Skip chapters that no longer exist when enqueuing downloads instead of failing the whole request
+- (**Downloads/API**) Avoid repeating an existing CBZ suffix in exported chapter archive filenames
+- (**Downloads/API**) Expose download error messages
+- (**Downloads/API**) Fix single-chapter enqueue requests timing out when the chapter is already queued
+- (**Downloads/API**) Return status when starting an empty download queue
+- (**Downloads/CBZ**) Handle missing archive files as not-downloaded
+- (**Extension**) Fix extension update/installation failure due to a missing older extension file
+- (**Extension/Android**) Fix Paint typeface replacements losing italic style and fractional text sizes
+- (**Extension/Android**) Implement Bitmap#createBitmap(int[],int,int,android.graphics.Bitmap.Config)
+- (**Extension/Android**) Implement HSV color conversions without Android native functions
+- (**Extension/Android**) Preserve bold style and the default font size for `Typeface.DEFAULT_BOLD`
+- (**Extension/Android**) Preserve image types when creating or copying bitmaps with their reported configurations
+- (**Image**) Recognize the AVIF image-sequence brand when identifying page images
+- (**Local Source**) Fix detection of Synology metadata folders as local chapters
+- (**Local source**) Fix EPUB archive paths being resolved as Windows filesystem paths
+- (**Network/WebView**) Fix configured SOCKS proxy not being used by WebView and Cloudflare bypass
+- (**Syncyomi**) Report chapters a source dropped to SyncYomi
+- (**Syncyomi**) Send library removals and history-only changes to SyncYomi
+- (**Thumbnails**) Refresh the thumbnail URL when its host is unreachable
+- (**Tracker**) Fix the possibility of attempting to insert multiple track searches
+- (**TrayIcon**) Use DorkBox OS 1.11 to restore tray menus on localized Windows
+- (**WebUI/API**) Fix server info queries failing when WebUI serving is disabled and no local WebUI version is installed
+- (**WebView**) Fix the server not shutting down on a termination signal once the WebView started
+- (**WebView**) Fix the WebView page keeping every received frame in memory
+- (**WebView**) Fix WebView pages sometimes staying open and running after being closed
+- (**WebView**) Report multi-profile and origin-matched request header support to extensions
+- (**WebView**) Pass `evaluateJavascript` results to extensions serialized as JSON, like Android
+- (**WebView**) Report dead renderers through `onRenderProcessGone` instead of leaving extensions waiting
+- (**WebView**) Fix `evaluateJavascript` not returning the result of multi-line scripts
+
+### Deprecated
+- (**Authentication**) `BASIC_AUTH` is now deprecated
+- (**Downloads/Updates/API**) Remove `maxUpdates` `download` and `update` subscription input as it is not needed anymore due to subscriptions now supporting data loader batching
+
+## [v2.4.2366] + [WebUI: v20260929.01] - 2026-09-29
+
+#### Bug Squashing and Optimizations!
+This release focuses on fixing many bugs and optimizing startup time! 
+
+#### [Syncyomi]([SyncYomi](https://github.com/syncyomi/syncyomi)) v2 Support!
+Syncyomi has released its next version of syncing your library, optimizing the sync and squashing many bugs! 
+
+### Added
+- (**API**) Add platform information to `aboutServer` query
+- (**Cache/API**) Add a way to clear cache & cookies
+- (**Category/API**) Add `isDefaultCategory` in preparation of incompatible changes of future versions
 - (**Downloads**) Try to preserve downloaded files during a chapter list update for chapters with title and/or scanlator change
 - (**Downloads/API**) Add batch GQL mutation for reordering chapter downloads (`reorderChapterDownloads`)
 - (**Logs**) Add IP location logging
-- (**Cache/API**) Add a way to clear cache & cookies
-- (**API**) Add platform information to `aboutServer` query
-- (**Category/API**) Add `isDefaultCategory` in preparation of incompatible changes of future versions
+- (**SyncYomi**) Support sync protocol v2: the server merges, only changes since the last upload are sent and category deletions are reported explicitly
 
 ### Changed
-- (**SystemTray**) Disable DorkBox update requests
-- (**GraphQL**) Updated GraphiQL GraphQL Playground
-- (**Downloads**) Skip LocalSource downloading
 - (**Cloudflare/flaresolverr**) Send full `POST` json body to flaresolverr instead of empty string
+- (**Downloads**) Skip LocalSource downloading
+- (**GraphQL**) Updated GraphiQL GraphQL Playground
+- (**SystemTray**) Disable DorkBox update requests
 - (**Webview**) Don't throw an exception when disabling CEF
 
 ### Fixed
-- (**SyncYomi**) Adopt the server's record versions when restoring a sync response so a manga or chapter that lost a merge once can win later; a one-time full converging sync repairs skewed version counters
-- (**SyncYomi**) Keep TachiyomiSY's library sort, chapter sort/filter and reading mode flags when Suwayomi's copy wins a sync
-- (**SyncYomi**) Fix local changes never winning a sync on PostgreSQL (version triggers were no-ops), chapter versions being reset on chapter refresh, category removals and tracking changes never bumping the manga version, and sync restores re-stamping every row as locally modified
-- (**SyncYomi**) Chapter reads no longer bump the manga version, which let the device that read more chapters silently revert the other device's category/tracking changes
-- (**SyncYomi/Category**) Fix category reorder not syncing after a sync adopted a peer's 0-based category orders (collision with the default category broke the WebUI reorder)
-- (**SyncYomi/Category**) Use the 0-based Mihon/SY category order convention on the sync wire and store incoming orders as 1-based ranks, so category positions converge between Suwayomi and Tachiyomi forks
-- (**Backup/SyncYomi**) Fix restoring a library that originated from another client or was re-encoded by the sync server ("Field 'libraryId' is required ... but it was missing")
+- (**Category**) Fix library/category counts not matching the actual number of manga due to duplicate category-manga rows
+- (**Chapter**) Fix the fallback upload date of new chapters without one being stored in seconds instead of milliseconds (sorted as early 1970); existing chapters are repaired by a migration
 - (**Cloudflare/flaresolverr**) Treat a bypass as successful when a `cf_clearance` cookie is returned, so non-CloudFlare source errors are correctly passed through to the extensions.
-- (**Manga/Extension**) Fix resolving manga URLs for extensions that use memo data
-- (**Tracker**) Fix Shikimori
-- (**Extension**) Fix losing installed extension in case the update fails
-- (**Source/API**) Fix graphql browse mutation (`fetchSourceManga`) with filters including nested group changes
-- (**HTML**) Fix HTML being sent with gibberish when using non-latin characters
-- (**OPDS**) Fix OPDS search charset
+- (**Download/API**) Fix subscription returning stale chapter data in some cases
 - (**Downloads/API**) Fix graphql download queue items position field of unmodified items after a reorder
 - (**Downloads/API**) Fix sending updates for dequeued downloads
-- (**Download/API**) Fix subscription returning stale chapter data in some cases
-- (**WebView**) Fix that UI-WebView did not share user agent (background WebView unchanged)
-- (**WebView**) Fix authentication with subpath option
-- (**WebView**) Fix `kcef` causing the server startup to fail
-- (**Category**) Fix library/category counts not matching the actual number of manga due to duplicate category-manga rows
-- (**Migration/Extension**) Fix `extensionRepos` setting not being migrated to `extensionStores`
+- (**Extension**) Fix extension update failure potentially causing a NullPointerException on the next update attempt
+- (**Extension**) Fix losing installed extension in case the update fails
 - (**Extension/Android**) Implement fromHtml with flags for author's note support
+- (**Extension/Android**) Implement `Resources` for improved WebView support
+- (**Extension/Android**) Implement private Chromium methods for improved WebView support
+- (**Extension/Settings**) Fix `extensionRepos` setting not being migrated to `extensionStores`
+- (**HTML**) Fix HTML being sent with gibberish when using non-latin characters
+- (**Manga/Extension**) Fix resolving manga URLs for extensions that use memo data
+- (**OPDS**) Fix OPDS search charset
+- (**Source/API**) Fix graphql browse mutation (`fetchSourceManga`) with filters including nested group changes
+- (**SyncYomi**) Adopt the server's record versions when restoring a sync response so a manga or chapter that lost a merge once can win later; a one-time full converging sync repairs skewed version counters
+- (**SyncYomi**) Chapter reads no longer bump the manga version, which let the device that read more chapters silently revert the other device's category/tracking changes
+- (**SyncYomi**) Fix local changes never winning a sync on PostgreSQL (version triggers were no-ops), chapter versions being reset on chapter refresh, category removals and tracking changes never bumping the manga version, and sync restores re-stamping every row as locally modified
+- (**SyncYomi**) Keep TachiyomiSY's library sort, chapter sort/filter and reading mode flags when Suwayomi's copy wins a sync
+- (**SyncYomi/Backup**) Fix restoring a library that originated from another client or was re-encoded by the sync server ("Field 'libraryId' is required ... but it was missing")
+- (**SyncYomi/Category**) Fix category reorder not syncing after a sync adopted a peer's 0-based category orders (collision with the default category broke the WebUI reorder)
+- (**SyncYomi/Category**) Use the 0-based Mihon/SY category order convention on the sync wire and store incoming orders as 1-based ranks, so category positions converge between Suwayomi and Tachiyomi forks
+- (**Tracker**) Fix Shikimori
+- (**WebView**) Fix `kcef` causing the server startup to fail
+- (**WebView**) Fix authentication with subpath option
+- (**WebView**) Fix that UI-WebView did not share user agent (background WebView unchanged)
+- (**Security**) Form submissions now require a CSRF cookie to prevent forgery
+
+### Removed
+- (**API**) The deprecated REST API has been removed
 
 ## [v2.3.2243] - 2026-07-13
 
@@ -512,7 +589,7 @@ Huge thanks to @martinek who pulled the most of the weight this release!
 - N/A
 
 <!-- WEBUI LINKS -->
-
+[WebUI: v20260929.01]: https://github.com/Suwayomi/Suwayomi-WebUI/blob/master/CHANGELOG.md#2026092901-r3518---2026-09-29
 [WebUI: v20260509.01]: https://github.com/Suwayomi/Suwayomi-WebUI/blob/master/CHANGELOG.md#2026050901-r3147---2026-05-09
 [WebUI: v20260508.01]: https://github.com/Suwayomi/Suwayomi-WebUI/blob/master/CHANGELOG.md#2026050801-r3136---2026-05-08
 [WebUI: v20251230.01]: https://github.com/Suwayomi/Suwayomi-WebUI/blob/master/CHANGELOG.md#2025123001-r2937---2025-12-30
@@ -540,7 +617,8 @@ Huge thanks to @martinek who pulled the most of the weight this release!
 
 <!-- SERVER LINKS -->
 
-[unreleased]: https://github.com/suwayomi/suwayomi-server/compare/v2.3.2243...HEAD
+[unreleased]: https://github.com/suwayomi/suwayomi-server/compare/v2.4.2366...HEAD
+[v2.4.2366]: https://github.com/suwayomi/suwayomi-server/compare/v2.3.2243...v2.4.2366
 [v2.3.2243]: https://github.com/suwayomi/suwayomi-server/compare/v2.3.2238...v2.3.2243
 [v2.3.2238]: https://github.com/suwayomi/suwayomi-server/compare/v2.3.2232...v2.3.2238
 [v2.3.2232]: https://github.com/suwayomi/suwayomi-server/compare/v2.3.2230...v2.3.2232

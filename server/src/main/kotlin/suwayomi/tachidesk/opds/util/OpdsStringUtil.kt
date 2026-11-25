@@ -1,37 +1,20 @@
 package suwayomi.tachidesk.opds.util
 
-import suwayomi.tachidesk.server.serverConfig
+import suwayomi.tachidesk.server.settings.userConfig
+import suwayomi.tachidesk.server.settings.value
 import java.net.URLEncoder
-import java.text.Normalizer
 
 /**
  * Utilities for string handling in the OPDS context.
  */
 object OpdsStringUtil {
-    private val DIACRITICS_REGEX = "\\p{InCombiningDiacriticalMarks}+".toRegex()
-
     /**
      * Encodes a string to be used in OPDS URLs.
      * @return The URL-encoded string
      */
-    fun String.encodeForOpdsURL(): String = URLEncoder.encode(this, Charsets.UTF_8)
+    fun String.encodeForOpdsURL(): String = URLEncoder.encode(this, Charsets.UTF_8).replace("+", "%20")
 
-    /**
-     * Converts a string into a URL-friendly slug.
-     * e.g., "Virtual Reality" -> "virtual-reality"
-     * @return The slugified string
-     */
-    fun String.slugify(): String {
-        val normalized = Normalizer.normalize(this, Normalizer.Form.NFD)
-        val slug =
-            DIACRITICS_REGEX
-                .replace(normalized, "")
-                .lowercase()
-                .replace(Regex("[^a-z0-9]+"), "-") // Replace non-alphanumeric with hyphens
-                .replace(Regex("-+"), "-") // Replace multiple hyphens with single
-                .trim('-')
-        return slug
-    }
+    fun String.escapeXml(): String = replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
     /**
      * Formats the source name appending the language code if applicable.
@@ -53,8 +36,11 @@ object OpdsStringUtil {
      * @param size Size in bytes
      * @return Human-readable representation of the size
      */
-    fun formatFileSizeForOpds(size: Long): String =
-        if (serverConfig.opdsUseBinaryFileSizes.value) {
+    fun formatFileSizeForOpds(
+        userId: Int,
+        size: Long,
+    ): String =
+        if (userConfig.opdsUseBinaryFileSizes.value(userId)) {
             // Binary notation (base 1024)
             when {
                 // 1024^4

@@ -190,7 +190,7 @@ abstract class ChaptersFilesProvider<Type : FileType>(
         // Calculate and save Koreader hash for CBZ files
         val chapterFile = File(getChapterCbzPath(mangaId, chapterId))
         if (chapterFile.exists()) {
-            val koreaderHash = KoreaderHelper.hashContents(chapterFile)
+            val koreaderHash = KoreaderHelper.hashContents(chapterFile.inputStream())
             if (koreaderHash != null) {
                 transaction {
                     ChapterTable.update({ ChapterTable.id eq chapterId }) {

@@ -6,7 +6,17 @@ import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.network.await
 import eu.kanade.tachiyomi.util.lang.Hash
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.github.reactivecircus.cache4k.Cache
 import io.javalin.json.JsonMapper
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.job
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -14,9 +24,12 @@ import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.jetbrains.exposed.v1.core.Op
+import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
+import org.jetbrains.exposed.v1.core.innerJoin
 import org.jetbrains.exposed.v1.jdbc.select
-import org.jetbrains.exposed.v1.jdbc.transactions.suspendTransaction
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
 import suwayomi.tachidesk.graphql.types.KoSyncStatusPayload
@@ -25,28 +38,51 @@ import suwayomi.tachidesk.graphql.types.KoreaderSyncConflictStrategy
 import suwayomi.tachidesk.manga.impl.ChapterDownloadHelper
 import suwayomi.tachidesk.manga.impl.util.KoreaderHelper
 import suwayomi.tachidesk.manga.model.table.ChapterTable
+import suwayomi.tachidesk.manga.model.table.ChapterUserTable
 import suwayomi.tachidesk.manga.model.table.MangaTable
-import suwayomi.tachidesk.server.serverConfig
+import suwayomi.tachidesk.manga.model.table.getWithUserData
+import suwayomi.tachidesk.manga.model.table.toDataClass
+import suwayomi.tachidesk.server.settings.userConfig
+import suwayomi.tachidesk.server.settings.value
 import suwayomi.tachidesk.server.util.Platform
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
-import java.io.File
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 object KoreaderSyncService {
-    private val preferences = Injekt.get<Application>().getSharedPreferences("koreader_sync", Context.MODE_PRIVATE)
+    private val logger = KotlinLogging.logger {}
 
+    // Per-user connection credentials are stored in SharedPreferences keyed by user id (not in the per-user settings
+    // store, since they are account secrets rather than user preferences).
+    private val preferences = Injekt.get<Application>().getSharedPreferences("koreader_sync", Context.MODE_PRIVATE)
     private const val SERVER_ADDRESS_KEY = "server_address"
     private const val USERNAME_KEY = "username"
     private const val USERKEY_KEY = "user_key"
     private const val DEVICE_ID_KEY = "client_id"
 
-    private val logger = KotlinLogging.logger {}
+    private fun key(
+        base: String,
+        userId: Int,
+    ) = "${base}_$userId"
+
     private val network: NetworkHelper by injectLazy()
     private val json: Json by injectLazy()
     private val jsonMapper: JsonMapper by injectLazy()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val pendingPushes = ConcurrentHashMap<Pair<Int, Int>, Job>()
+    private val remoteProgressCache =
+        Cache
+            .Builder<Pair<Int, String>, KoreaderProgressResponse>()
+            .expireAfterWrite(1.minutes)
+            .build()
+
+    // The strategies that make use of the remote progress
+    private val remoteProgressStrategies = setOf(KoreaderSyncConflictStrategy.PROMPT, KoreaderSyncConflictStrategy.KEEP_REMOTE)
 
     @Serializable
     private data class KoreaderProgressPayload(
@@ -62,7 +98,7 @@ object KoreaderSyncService {
         val document: String? = null,
         val progress: String? = null,
         val percentage: Float? = null,
-        val updated_at: Long? = null,
+        val timestamp: Long? = null,
         val device: String? = null,
         val device_id: String? = null,
     )
@@ -75,6 +111,19 @@ object KoreaderSyncService {
         val shouldUpdate: Boolean = false,
         val isConflict: Boolean = false,
     )
+
+    private class SyncSettings(
+        val progressUrl: String,
+        val username: String,
+        val userkey: String,
+        val deviceId: String,
+        val checksumMethod: KoreaderSyncChecksumMethod,
+        val forwardStrategy: KoreaderSyncConflictStrategy,
+        val backwardStrategy: KoreaderSyncConflictStrategy,
+        val percentageTolerance: Double,
+    ) {
+        val usesRemoteProgress = forwardStrategy in remoteProgressStrategies || backwardStrategy in remoteProgressStrategies
+    }
 
     data class ConnectResult(
         val message: String? = null,
@@ -95,12 +144,11 @@ object KoreaderSyncService {
             .Builder()
             .url(url)
             .addHeader("Accept", "application/vnd.koreader.v1+json")
-            .addHeader("Connection", "close")
             .apply(block)
             .build()
 
-    private suspend fun getOrGenerateDeviceId(): String {
-        var deviceId = preferences.getString(DEVICE_ID_KEY, "")!!
+    private suspend fun getOrGenerateDeviceId(userId: Int): String {
+        var deviceId = preferences.getString(key(DEVICE_ID_KEY, userId), "")!!
 
         if (deviceId.isBlank()) {
             deviceId =
@@ -109,85 +157,77 @@ object KoreaderSyncService {
                     .toString()
                     .replace("-", "")
                     .uppercase()
-            logger.info { "[KOSYNC] Generated new KOSync Device ID: $deviceId" }
-            preferences.edit().putString(DEVICE_ID_KEY, deviceId).apply()
+            logger.info { "[KOSYNC] Generated new KOSync Device ID for user $userId: $deviceId" }
+            preferences.edit().putString(key(DEVICE_ID_KEY, userId), deviceId).apply()
         }
         return deviceId
     }
 
-    private suspend fun getOrGenerateChapterHash(chapterId: Int): String? {
-        return suspendTransaction {
-            val chapterRow =
-                ChapterTable
-                    .select(ChapterTable.koreaderHash, ChapterTable.manga, ChapterTable.isDownloaded)
-                    .where { ChapterTable.id eq chapterId }
-                    .firstOrNull() ?: return@suspendTransaction null
-
-            val existingHash = chapterRow[ChapterTable.koreaderHash]
-            if (!existingHash.isNullOrBlank()) {
-                return@suspendTransaction existingHash
-            }
-
-            val mangaId = chapterRow[ChapterTable.manga].value
-            val isDownloaded = chapterRow[ChapterTable.isDownloaded]
-            val checksumMethod = serverConfig.koreaderSyncChecksumMethod.value
-
-            val newHash =
-                when (checksumMethod) {
-                    KoreaderSyncChecksumMethod.BINARY -> {
-                        // Only generate binary hash if the chapter is downloaded to avoid fetching missing files
-                        if (isDownloaded) {
-                            logger.debug { "[KOSYNC HASH] No hash for chapterId=$chapterId. Generating from downloaded content." }
-                            try {
-                                // Always create a CBZ in memory if it doesn't exist
-                                val (stream, _) = ChapterDownloadHelper.getArchiveStreamWithSize(mangaId, chapterId)
-                                // Write the stream to a temp file for partial hashing
-                                val tempFile = File.createTempFile("kosync-hash-", ".cbz")
-                                try {
-                                    tempFile.outputStream().use { fos ->
-                                        stream.use { it.copyTo(fos) }
-                                    }
-                                    // Use the same hashing method as for downloads
-                                    KoreaderHelper.hashContents(tempFile)
-                                } finally {
-                                    // Always delete the temp file
-                                    tempFile.delete()
-                                }
-                            } catch (e: Exception) {
-                                logger.warn(e) { "[KOSYNC HASH] Failed to generate archive stream for chapterId=$chapterId." }
-                                null
-                            }
-                        } else {
-                            logger.debug { "[KOSYNC HASH] Skipping binary hash for chapterId=$chapterId because it is not downloaded." }
-                            null
-                        }
-                    }
-
-                    KoreaderSyncChecksumMethod.FILENAME -> {
-                        logger.debug { "[KOSYNC HASH] No hash for chapterId=$chapterId. Generating from filename." }
-                        (ChapterTable innerJoin MangaTable)
-                            .select(ChapterTable.name, MangaTable.title)
-                            .where { ChapterTable.id eq chapterId }
-                            .firstOrNull()
-                            ?.let {
-                                val chapterName = it[ChapterTable.name]
-                                val mangaTitle = it[MangaTable.title]
-                                val baseFilename = "$mangaTitle - $chapterName".split('.').dropLast(1).joinToString(".")
-                                Hash.md5(baseFilename)
-                            }
-                    }
-                }
-
-            if (newHash != null) {
-                ChapterTable.update({ ChapterTable.id eq chapterId }) {
-                    it[koreaderHash] = newHash
-                }
-                logger.info { "[KOSYNC HASH] Generated and saved new hash for chapterId=$chapterId" }
-            } else {
-                logger.warn { "[KOSYNC HASH] Hashing failed or skipped for chapterId=$chapterId." }
-            }
-            newHash
+    /**
+     * Selects the chapters with what is needed to hash them and to compare
+     * the progress of the user.
+     */
+    private fun selectChapters(
+        userId: Int,
+        condition: Op<Boolean>,
+    ): List<ResultRow> =
+        transaction {
+            ChapterTable
+                .getWithUserData(userId)
+                .innerJoin(MangaTable, { ChapterTable.manga }, { MangaTable.id })
+                .select(
+                    ChapterTable.columns + MangaTable.title + ChapterUserTable.isRead + ChapterUserTable.lastPageRead +
+                        ChapterUserTable.lastReadAt,
+                ).where(condition)
+                .toList()
         }
+
+    /**
+     * Returns the hash KOReader computes for the CBZ download of the chapter,
+     * unknown for the binary checksum until the downloaded file is hashed.
+     */
+    private fun ResultRow.koreaderHash(checksumMethod: KoreaderSyncChecksumMethod): String? =
+        when (checksumMethod) {
+            // KOReader keeps this name when the catalog uses server file names
+            KoreaderSyncChecksumMethod.FILENAME -> {
+                Hash.md5(ChapterDownloadHelper.getCbzFileName(this[MangaTable.title], ChapterTable.toDataClass(this)))
+            }
+
+            KoreaderSyncChecksumMethod.BINARY -> {
+                this[ChapterTable.koreaderHash]
+            }
+        }
+
+    private suspend fun getOrGenerateChapterHash(
+        settings: SyncSettings,
+        chapter: ResultRow,
+    ): String? {
+        chapter.koreaderHash(settings.checksumMethod)?.let { return it }
+
+        val chapterId = chapter[ChapterTable.id].value
+        // Only downloaded chapters are hashed, to avoid fetching their pages
+        if (!chapter[ChapterTable.isDownloaded]) {
+            logger.debug { "[KOSYNC HASH] Skipping binary hash for chapterId=$chapterId because it is not downloaded." }
+            return null
+        }
+
+        logger.debug { "[KOSYNC HASH] No hash for chapterId=$chapterId. Generating from downloaded content." }
+        val newHash =
+            try {
+                ChapterDownloadHelper
+                    .getArchiveStreamWithSize(chapter[ChapterTable.manga].value, chapterId)
+                    .first
+                    .let(KoreaderHelper::hashContents)
+            } catch (e: Exception) {
+                logger.warn(e) { "[KOSYNC HASH] Failed to generate archive stream for chapterId=$chapterId." }
+                null
+            } ?: return null
+
+        transaction {
+            ChapterTable.update({ ChapterTable.id eq chapterId }) { it[koreaderHash] = newHash }
+        }
+        logger.info { "[KOSYNC HASH] Generated and saved new hash for chapterId=$chapterId" }
+        return newHash
     }
 
     private suspend fun register(
@@ -255,32 +295,59 @@ object KoreaderSyncService {
         }
     }
 
-    private fun getCredentials(): Triple<String, String, String> {
-        val serverAddress = preferences.getString(SERVER_ADDRESS_KEY, "https://sync.koreader.rocks/")!!
-        val username = preferences.getString(USERNAME_KEY, "")!!
-        val userkey = preferences.getString(USERKEY_KEY, "")!!
+    /**
+     * Returns null when the user is not logged in.
+     */
+    private suspend fun getSyncSettings(userId: Int): SyncSettings? {
+        val (serverAddress, username, userkey) = getCredentials(userId)
+        if (serverAddress.isBlank() || username.isBlank() || userkey.isBlank()) return null
+
+        return SyncSettings(
+            "${serverAddress.removeSuffix("/")}/syncs/progress",
+            username,
+            userkey,
+            getOrGenerateDeviceId(userId),
+            userConfig.koreaderSyncChecksumMethod.value(userId),
+            userConfig.koreaderSyncStrategyForward.value(userId),
+            userConfig.koreaderSyncStrategyBackward.value(userId),
+            userConfig.koreaderSyncPercentageTolerance.value(userId),
+        )
+    }
+
+    private fun getCredentials(userId: Int): Triple<String, String, String> {
+        val serverAddress = preferences.getString(key(SERVER_ADDRESS_KEY, userId), "https://sync.koreader.rocks/")!!
+        val username = preferences.getString(key(USERNAME_KEY, userId), "")!!
+        val userkey = preferences.getString(key(USERKEY_KEY, userId), "")!!
 
         return Triple(serverAddress, username, userkey)
     }
 
     private fun setCredentials(
+        userId: Int,
         serverAddress: String,
         username: String,
         userkey: String,
     ) {
         preferences
             .edit()
-            .putString(SERVER_ADDRESS_KEY, serverAddress)
-            .putString(USERNAME_KEY, username)
-            .putString(USERKEY_KEY, userkey)
+            .putString(key(SERVER_ADDRESS_KEY, userId), serverAddress)
+            .putString(key(USERNAME_KEY, userId), username)
+            .putString(key(USERKEY_KEY, userId), userkey)
             .apply()
     }
 
-    private fun clearCredentials() {
-        preferences.edit().clear().apply()
+    private fun clearCredentials(userId: Int) {
+        preferences
+            .edit()
+            .remove(key(SERVER_ADDRESS_KEY, userId))
+            .remove(key(USERNAME_KEY, userId))
+            .remove(key(USERKEY_KEY, userId))
+            .remove(key(DEVICE_ID_KEY, userId))
+            .apply()
     }
 
     suspend fun connect(
+        userId: Int,
         serverAddress: String,
         username: String,
         password: String,
@@ -289,7 +356,7 @@ object KoreaderSyncService {
         val authResult = authorize(serverAddress, username, userkey)
 
         if (authResult.success) {
-            setCredentials(serverAddress, username, userkey)
+            setCredentials(userId, serverAddress, username, userkey)
             return ConnectResult(
                 "Login successful.",
                 KoSyncStatusPayload(isLoggedIn = true, serverAddress = serverAddress, username = username),
@@ -300,7 +367,7 @@ object KoreaderSyncService {
             logger.info { "[KOSYNC CONNECT] Authorization failed, attempting to register new user." }
             val registerResult = register(serverAddress, username, userkey)
             return if (registerResult.success) {
-                setCredentials(serverAddress, username, userkey)
+                setCredentials(userId, serverAddress, username, userkey)
                 ConnectResult(
                     "Registration successful.",
                     KoSyncStatusPayload(isLoggedIn = true, serverAddress = serverAddress, username = username),
@@ -319,12 +386,12 @@ object KoreaderSyncService {
         )
     }
 
-    fun logout() {
-        clearCredentials()
+    fun logout(userId: Int) {
+        clearCredentials(userId)
     }
 
-    suspend fun getStatus(): KoSyncStatusPayload {
-        val (serverAddress, username, userkey) = getCredentials()
+    suspend fun getStatus(userId: Int): KoSyncStatusPayload {
+        val (serverAddress, username, userkey) = getCredentials(userId)
 
         if (username.isBlank() || userkey.isBlank()) {
             return KoSyncStatusPayload(isLoggedIn = false, serverAddress = null, username = null)
@@ -339,65 +406,76 @@ object KoreaderSyncService {
         }
     }
 
-    suspend fun pushProgress(chapterId: Int) {
-        val forwardStrategy = serverConfig.koreaderSyncStrategyForward.value
-        val backwardStrategy = serverConfig.koreaderSyncStrategyBackward.value
+    /**
+     * Pushes the progress of a chapter once it stops changing for a few
+     * seconds, as reading updates it on every page.
+     */
+    fun schedulePushProgress(
+        userId: Int,
+        chapterId: Int,
+    ) {
+        pendingPushes.compute(userId to chapterId) { key, pendingPush ->
+            pendingPush?.cancel()
+            scope.launch {
+                delay(5.seconds)
+                pendingPushes.remove(key, coroutineContext.job)
+                pushProgress(userId, chapterId)
+            }
+        }
+    }
+
+    suspend fun pushProgress(
+        userId: Int,
+        chapterId: Int,
+    ) {
+        val settings = getSyncSettings(userId) ?: return
 
         // if both directions keep remote, is in receive-only mode, so don't push.
-        if (forwardStrategy == KoreaderSyncConflictStrategy.KEEP_REMOTE &&
-            backwardStrategy == KoreaderSyncConflictStrategy.KEEP_REMOTE
+        if (settings.forwardStrategy == KoreaderSyncConflictStrategy.KEEP_REMOTE &&
+            settings.backwardStrategy == KoreaderSyncConflictStrategy.KEEP_REMOTE
         ) {
             return
         }
 
-        val (serverAddress, username, userkey) = getCredentials()
-        if (serverAddress.isBlank() || username.isBlank() || userkey.isBlank()) return
-
-        val chapterHash = getOrGenerateChapterHash(chapterId)
-        if (chapterHash.isNullOrBlank()) {
-            logger.info { "[KOSYNC PUSH] Aborted for chapterId=$chapterId: No hash." }
-            return
-        }
-
-        val chapterInfo =
-            transaction {
-                ChapterTable
-                    .select(ChapterTable.lastPageRead, ChapterTable.pageCount)
-                    .where { ChapterTable.id eq chapterId }
-                    .firstOrNull()
-                    ?.let {
-                        object {
-                            val lastPageRead = it[ChapterTable.lastPageRead]
-                            val pageCount = it[ChapterTable.pageCount]
-                        }
-                    }
-            } ?: return
-
-        if (chapterInfo.pageCount <= 0) {
+        val chapter = selectChapters(userId, ChapterTable.id eq chapterId).firstOrNull() ?: return
+        val pageCount = chapter[ChapterTable.pageCount]
+        if (pageCount <= 0) {
             logger.warn { "[KOSYNC PUSH] Aborted for chapterId=$chapterId: Invalid pageCount." }
             return
         }
 
+        val chapterHash = getOrGenerateChapterHash(settings, chapter)
+        if (chapterHash == null) {
+            logger.info { "[KOSYNC PUSH] Aborted for chapterId=$chapterId: No hash." }
+            return
+        }
+
         try {
-            val deviceId = getOrGenerateDeviceId()
+            // A chapter marked as read is finished, whatever page was open last
+            val pageRead =
+                if (chapter.getOrNull(ChapterUserTable.isRead) == true) {
+                    pageCount
+                } else {
+                    (chapter.getOrNull(ChapterUserTable.lastPageRead) ?: 0) + 1
+                }
             val payload =
                 KoreaderProgressPayload(
                     document = chapterHash,
-                    progress = (chapterInfo.lastPageRead + 1).toString(),
-                    percentage = (chapterInfo.lastPageRead + 1).toFloat() / chapterInfo.pageCount.toFloat(),
+                    progress = pageRead.toString(),
+                    percentage = pageRead.toFloat() / pageCount,
                     device = "Suwayomi-Server (${Platform.current.os.name})",
-                    device_id = deviceId,
+                    device_id = settings.deviceId,
                 )
 
             val requestBody = json.encodeToString(KoreaderProgressPayload.serializer(), payload)
             val request =
-                buildRequest("${serverAddress.removeSuffix("/")}/syncs/progress") {
+                buildRequest(settings.progressUrl) {
                     put(requestBody.toRequestBody("application/json".toMediaType()))
-                    addHeader("x-auth-user", username)
-                    addHeader("x-auth-key", userkey)
+                    addHeader("x-auth-user", settings.username)
+                    addHeader("x-auth-key", settings.userkey)
                 }
 
-            logger.info { "[KOSYNC PUSH] url= ${request.url} - Sending data: $requestBody" }
+            logger.debug { "[KOSYNC PUSH] url= ${request.url} - Sending data: $requestBody" }
 
             network.client.newCall(request).await().use { response ->
                 val responseBody = response.body.string()
@@ -406,6 +484,7 @@ object KoreaderSyncService {
                     logger.warn { "[KOSYNC PUSH] Failed for chapterId=$chapterId: ${response.code}" }
                 } else {
                     logger.info { "[KOSYNC PUSH] Success for chapterId=$chapterId" }
+                    remoteProgressCache.invalidate(userId to chapterHash)
                 }
             }
         } catch (e: Exception) {
@@ -413,32 +492,20 @@ object KoreaderSyncService {
         }
     }
 
-    suspend fun checkAndPullProgress(chapterId: Int): SyncResult? {
-        val forwardStrategy = serverConfig.koreaderSyncStrategyForward.value
-        val backwardStrategy = serverConfig.koreaderSyncStrategyBackward.value
-
-        // Skip remote fetch if both directions disabled OR both keep local (no remote data needed)
-        if ((forwardStrategy == KoreaderSyncConflictStrategy.DISABLED && backwardStrategy == KoreaderSyncConflictStrategy.DISABLED) ||
-            (forwardStrategy == KoreaderSyncConflictStrategy.KEEP_LOCAL && backwardStrategy == KoreaderSyncConflictStrategy.KEEP_LOCAL)
-        ) {
-            return null
-        }
-
-        val (serverAddress, username, userkey) = getCredentials()
-        if (serverAddress.isBlank() || username.isBlank() || userkey.isBlank()) return null
-
-        val chapterHash = getOrGenerateChapterHash(chapterId)
-        if (chapterHash.isNullOrBlank()) {
-            logger.debug { "[KOSYNC PULL] Aborted for chapterId=$chapterId: No hash." }
-            return null
-        }
-
+    /**
+     * Returns an empty progress when the document has none or the request
+     * fails.
+     */
+    private suspend fun fetchProgress(
+        settings: SyncSettings,
+        chapterHash: String,
+    ): KoreaderProgressResponse {
         try {
             val request =
-                buildRequest("${serverAddress.removeSuffix("/")}/syncs/progress/$chapterHash") {
+                buildRequest("${settings.progressUrl}/$chapterHash") {
                     get()
-                    addHeader("x-auth-user", username)
-                    addHeader("x-auth-key", userkey)
+                    addHeader("x-auth-user", settings.username)
+                    addHeader("x-auth-key", settings.userkey)
                 }
             network.client.newCall(request).await().use { response ->
                 logger.debug { "[KOSYNC PULL] GET response status: ${response.code}" }
@@ -446,64 +513,92 @@ object KoreaderSyncService {
                 if (response.isSuccessful) {
                     val body = response.body.string()
                     logger.debug { "[KOSYNC PULL] GET response body: $body" }
-                    if (body.isBlank() || body == "{}") return null
-
-                    val progressResponse = json.decodeFromString(KoreaderProgressResponse.serializer(), body)
-                    val pageRead = progressResponse.progress?.toIntOrNull()?.minus(1)
-                    val timestamp = progressResponse.updated_at
-                    val device = progressResponse.device ?: "KOReader"
-
-                    val localProgress =
-                        transaction {
-                            ChapterTable
-                                .select(ChapterTable.lastReadAt, ChapterTable.lastPageRead, ChapterTable.pageCount)
-                                .where { ChapterTable.id eq chapterId }
-                                .firstOrNull()
-                                ?.let {
-                                    object {
-                                        val lastReadAt = it[ChapterTable.lastReadAt]
-                                        val lastPageRead = it[ChapterTable.lastPageRead]
-                                        val pageCount = it[ChapterTable.pageCount]
-                                    }
-                                }
-                        }
-
-                    if (pageRead != null && timestamp != null) {
-                        // Ignore XPath progress for now as we only support paginated files
-                        if (progressResponse.progress?.startsWith("/") == true) {
-                            return null
-                        }
-
-                        val localPercentage =
-                            if ((localProgress?.pageCount ?: 0) > 0) {
-                                (localProgress!!.lastPageRead + 1).toFloat() / localProgress.pageCount
-                            } else {
-                                0f
-                            }
-                        val percentageDifference = abs(localPercentage - (progressResponse.percentage ?: 0f))
-
-                        // Progress is within tolerance, no sync needed
-                        if (percentageDifference < serverConfig.koreaderSyncPercentageTolerance.value) {
-                            return null
-                        }
-
-                        val localTimestamp = localProgress?.lastReadAt ?: 0L
-                        val isRemoteNewer = timestamp > localTimestamp
-                        val strategy = if (isRemoteNewer) forwardStrategy else backwardStrategy
-
-                        return when (strategy) {
-                            KoreaderSyncConflictStrategy.PROMPT -> SyncResult(pageRead, timestamp, device, isConflict = true)
-                            KoreaderSyncConflictStrategy.KEEP_REMOTE -> SyncResult(pageRead, timestamp, device, shouldUpdate = true)
-                            KoreaderSyncConflictStrategy.KEEP_LOCAL, KoreaderSyncConflictStrategy.DISABLED -> null
-                        }
-                    }
-                } else {
-                    logger.warn { "[KOSYNC PULL] Failed for chapterId=$chapterId: ${response.code}" }
+                    return json.decodeFromString(KoreaderProgressResponse.serializer(), body)
                 }
+                logger.warn { "[KOSYNC PULL] Failed for document=$chapterHash: ${response.code}" }
             }
         } catch (e: Exception) {
-            logger.error(e) { "[KOSYNC PULL] Exception for chapterId=$chapterId" }
+            logger.error(e) { "[KOSYNC PULL] Exception for document=$chapterHash" }
         }
-        return null
+        return KoreaderProgressResponse()
+    }
+
+    /**
+     * Like KOReader, ignores the progress pushed by this server or matching
+     * the local one, and applies the strategy of the direction it moves to.
+     */
+    private fun resolveSyncResult(
+        settings: SyncSettings,
+        remoteProgress: KoreaderProgressResponse,
+        chapter: ResultRow,
+    ): SyncResult? {
+        // XPath progress of reflowable documents is not a page number
+        val pageRead = remoteProgress.progress?.toIntOrNull()?.minus(1) ?: return null
+        val timestamp = remoteProgress.timestamp ?: return null
+        val lastPageRead = chapter.getOrNull(ChapterUserTable.lastPageRead) ?: 0
+        if (remoteProgress.device_id == settings.deviceId || pageRead == lastPageRead) return null
+
+        val pageCount = chapter[ChapterTable.pageCount]
+        val localPercentage = if (pageCount > 0) (lastPageRead + 1).toFloat() / pageCount else 0f
+        // Progress is within tolerance, no sync needed
+        if (abs(localPercentage - (remoteProgress.percentage ?: 0f)) < settings.percentageTolerance) return null
+
+        val strategy =
+            if (timestamp > (chapter.getOrNull(ChapterUserTable.lastReadAt) ?: 0)) settings.forwardStrategy else settings.backwardStrategy
+        if (strategy !in remoteProgressStrategies) return null
+
+        return SyncResult(
+            pageRead,
+            timestamp,
+            remoteProgress.device ?: "KOReader",
+            shouldUpdate = strategy == KoreaderSyncConflictStrategy.KEEP_REMOTE,
+            isConflict = strategy == KoreaderSyncConflictStrategy.PROMPT,
+        )
+    }
+
+    suspend fun checkAndPullProgress(
+        userId: Int,
+        chapterId: Int,
+    ): SyncResult? {
+        val settings = getSyncSettings(userId)?.takeIf { it.usesRemoteProgress } ?: return null
+        val chapter = selectChapters(userId, ChapterTable.id eq chapterId).firstOrNull() ?: return null
+
+        val chapterHash = getOrGenerateChapterHash(settings, chapter)
+        if (chapterHash == null) {
+            logger.debug { "[KOSYNC PULL] Aborted for chapterId=$chapterId: No hash." }
+            return null
+        }
+
+        return resolveSyncResult(settings, fetchProgress(settings, chapterHash), chapter)
+    }
+
+    /**
+     * Pulls the remote progress of several chapters for the OPDS list feeds.
+     *
+     * Chapters without a known hash are skipped, as hashing a download builds
+     * its archive. The sync server has no batch endpoint, so responses are
+     * cached briefly and only those received in a short wait are used.
+     */
+    suspend fun checkAndPullProgress(
+        userId: Int,
+        chapterIds: List<Int>,
+    ): Map<Int, SyncResult> {
+        val settings = getSyncSettings(userId)?.takeIf { it.usesRemoteProgress } ?: return emptyMap()
+
+        val syncResults = ConcurrentHashMap<Int, SyncResult>()
+        // Launched in the service scope, so late responses still fill the cache
+        val pulls =
+            selectChapters(userId, ChapterTable.id inList chapterIds).mapNotNull { chapter ->
+                val chapterHash = chapter.koreaderHash(settings.checksumMethod) ?: return@mapNotNull null
+                scope.launch {
+                    resolveSyncResult(
+                        settings,
+                        remoteProgressCache.get(userId to chapterHash) { fetchProgress(settings, chapterHash) },
+                        chapter,
+                    )?.let { syncResults[chapter[ChapterTable.id].value] = it }
+                }
+            }
+        withTimeoutOrNull(5.seconds) { pulls.joinAll() }
+        return syncResults.toMap()
     }
 }
